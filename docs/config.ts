@@ -139,7 +139,8 @@ function sidebarDesign(): DefaultTheme.SidebarItem[] {
         { text: 'Uptime Kuma 监控同步设计', link: 'kuma-design' },
         { text: '登录验证码设计', link: 'login-captcha' },
         { text: '用户套餐与资源隔离', link: 'subscription-multitenancy' },
-        { text: '普通用户域名控制台', link: 'ordinary-user-domain-console' }
+        { text: '普通用户域名控制台', link: 'ordinary-user-domain-console' },
+        { text: '普通用户 CDN 控制台', link: 'ordinary-user-dashboard' }
       ]
     }
   ]

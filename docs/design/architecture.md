@@ -185,6 +185,7 @@ OpenResty 健康与连接数 --> 边缘健康（瞬时，不作 24h 业务总量
 | 业务交付 / 边缘健康 / 主机资源分层 | 已提供数据≠宿主机网卡出站≠OpenResty 连接数，UI 与 API 分名分区 |
 | Pages artifact 与仓库构建分离 | 现有来源只导入预构建产物；未来 checkout/build 由 Server 隔离 executor 完成并复用 artifact pipeline，Agent 不执行第三方构建 |
 | 普通用户使用独立 custom API | 管理员保留全局 OpenFlare 控制台；普通用户只经 owner-scoped API 管理自己的 Zone、域名、源站和 CDN 规则，Pages owner 链路另行建设 |
+| 普通用户首页与管理员看板分流 | `/` 根据用户身份展示 CDN 资源控制台或全局运维总览；普通用户首页只调用 owner-scoped custom API，避免暴露管理员观测数据 |
 
 ---
 
@@ -201,4 +202,5 @@ OpenResty 健康与连接数 --> 边缘健康（瞬时，不作 24h 业务总量
    * Pages 托管开发：阅读 [Pages 静态托管设计](./pages-design.md)。
    * 监控同步开发：阅读 [Uptime Kuma 监控同步设计](./kuma-design.md)。
    * 看板/访问日志/节点指标开发：阅读 [观测数据传输模型](./observability-transport-model.md) 与 [边缘可观测与业务流量统计](./observability-design.md)。
+   * 普通用户首页与 CDN 操作引导开发：阅读 [普通用户 CDN 控制台设计](./ordinary-user-dashboard.md)。
 5. **[仓库结构](./index.md#仓库结构)**：明确各个物理目录分层职责，避免堆砌和重复开发。

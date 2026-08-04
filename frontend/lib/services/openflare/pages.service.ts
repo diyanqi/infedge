@@ -20,7 +20,8 @@ import type {
 } from './types';
 
 export class PagesService extends OpenFlareBaseService {
-  protected static override readonly basePath: string = '/api/v1/custom/pages';
+  protected static override readonly basePath: string =
+    '/api/v1/custom/resources/pages';
 
   static listProjects(): Promise<PagesProject[]> {
     return this.get<PagesProject[]>('/');

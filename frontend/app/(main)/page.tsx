@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/user-context';
 import { LayoutDashboard, RefreshCw } from 'lucide-react';
 
@@ -22,22 +21,33 @@ import { NetworkDiskTrendChart } from './components/dashboard/network-disk-trend
 import { NodeHealthTable } from './components/dashboard/node-health-table';
 import { TrafficTrendChart } from './components/dashboard/traffic-trend-chart';
 import { WorldStage } from './components/dashboard/world-stage';
+import { OrdinaryDashboard } from './components/dashboard/ordinary-dashboard';
 import { getErrorMessage } from './nodes/components/node-utils';
 
 const dashboardQueryKey = ['openflare', 'dashboard', 'overview'];
 
 export default function OpenFlareDashboardPage() {
-  const router = useRouter();
   const { user, loading } = useUser();
   const overviewQuery = useQuery({
     queryKey: dashboardQueryKey,
     queryFn: () => DashboardService.getOverview(),
     refetchInterval: 60_000,
+    enabled: user?.is_admin === true,
   });
 
-  if (!loading && user && !user.is_admin) {
-    router.replace('/resources');
-    return null;
+  if (loading) {
+    return (
+      <div className='w-full px-1 py-6'>
+        <LoadingStateWithBorder
+          title='正在准备控制台'
+          description='正在读取你的 CDN 资源...'
+        />
+      </div>
+    );
+  }
+
+  if (user && !user.is_admin) {
+    return <OrdinaryDashboard />;
   }
 
   const overview = overviewQuery.data;
