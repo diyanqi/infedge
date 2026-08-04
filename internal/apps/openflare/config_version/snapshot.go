@@ -42,6 +42,7 @@ const (
 
 type snapshotRoute struct {
 	ID                 uint                             `json:"id,omitempty"`
+	OwnerID            uint64                           `json:"owner_id,omitempty"`
 	SiteName           string                           `json:"site_name,omitempty"`
 	Domains            []string                         `json:"domains,omitempty"`
 	OriginURL          string                           `json:"origin_url"`
@@ -275,6 +276,7 @@ func buildSnapshotRoutes(ctx context.Context, routes []*model.ProxyRoute) ([]sna
 		}
 		items = append(items, snapshotRoute{
 			ID:                 route.ID,
+			OwnerID:            route.OwnerID,
 			SiteName:           route.SiteName,
 			Domains:            domains,
 			OriginURL:          originURL,

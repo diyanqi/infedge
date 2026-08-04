@@ -14,6 +14,7 @@ export interface NodeItem {
   id: number;
   node_id: string;
   node_type: NodeType;
+  monthly_bytes_limit?: number;
   name: string;
   ip: string;
   ip_manual_override: boolean;
@@ -62,6 +63,7 @@ export interface NodeBootstrapToken {
 
 export interface NodeMutationPayload {
   node_type: NodeType;
+  monthly_bytes_limit?: number;
   name: string;
   ip: string;
   ip_manual_override: boolean;

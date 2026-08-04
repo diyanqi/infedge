@@ -201,11 +201,12 @@ func invalidateCachesAfterConfigUpdate(ctx context.Context, key string) {
 
 // TestSMTPRequest 测试 SMTP 配置请求
 type TestSMTPRequest struct {
-	SMTPHost     string `json:"smtp_host" binding:"required,max=255"`
-	SMTPPort     int    `json:"smtp_port" binding:"required"`
-	SMTPUsername string `json:"smtp_username" binding:"required,max=255"`
-	SMTPPassword string `json:"smtp_password" binding:"required,max=255"`
-	To           string `json:"to" binding:"required,email"`
+	SMTPHost      string `json:"smtp_host" binding:"required,max=255"`
+	SMTPPort      int    `json:"smtp_port" binding:"required"`
+	SMTPUsername  string `json:"smtp_username" binding:"required,max=255"`
+	SMTPFromEmail string `json:"smtp_from_email" binding:"omitempty,email,max=255"`
+	SMTPPassword  string `json:"smtp_password" binding:"required,max=255"`
+	To            string `json:"to" binding:"required,email"`
 }
 
 // TestSMTPResponse 测试 SMTP 配置响应
@@ -241,10 +242,14 @@ func TestSMTP(c *gin.Context) {
 	}
 
 	cfg := mail.Config{
-		Host:     req.SMTPHost,
-		Port:     req.SMTPPort,
-		Username: req.SMTPUsername,
-		Password: password,
+		Host:      req.SMTPHost,
+		Port:      req.SMTPPort,
+		Username:  req.SMTPUsername,
+		Password:  password,
+		FromEmail: req.SMTPFromEmail,
+	}
+	if cfg.FromEmail == "" {
+		cfg.FromEmail = cfg.Username
 	}
 
 	subject := "OpenFlare SMTP Test Mail"

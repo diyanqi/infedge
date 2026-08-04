@@ -165,6 +165,7 @@ OpenResty 健康与连接数 --> 边缘健康（瞬时，不作 24h 业务总量
 * **节点与穿透**：`nodes` (节点), `tunnels` (隧道客户端), `node_system_profiles` (系统概况), `apply_logs` (应用日志).
 * **WAF 与安全**：`waf_rule_groups` (WAF规则组), `waf_ip_groups` (WAF IP组), `waf_rule_group_bindings` (网站WAF绑定).
 * **系统与账号**：`acme_accounts` (ACME账户), `dns_accounts` (DNS账户), `geoip_update_configs` (GeoIP更新配置).
+* **用户与配额**：`of_subscription_plans` (套餐), `of_user_subscriptions` (订阅), `of_payment_channels` / `of_payment_orders` (易支付), `of_node_groups` (节点组), 以及核心 CDN 资源上的 `owner_id`.
 
 ---
 
@@ -181,6 +182,7 @@ OpenResty 健康与连接数 --> 边缘健康（瞬时，不作 24h 业务总量
 | 业务流量以访问日志为唯一真相   | Agent 禁止业务预聚合；看板与 Zone 共用 Server 侧聚合，避免 openresty_tx 与 bytes_sent 双轨 |
 | 业务交付 / 边缘健康 / 主机资源分层 | 已提供数据≠宿主机网卡出站≠OpenResty 连接数，UI 与 API 分名分区 |
 | Pages artifact 与仓库构建分离 | 现有来源只导入预构建产物；未来 checkout/build 由 Server 隔离 executor 完成并复用 artifact pipeline，Agent 不执行第三方构建 |
+| 普通用户使用独立 custom API | 管理员保留全局 OpenFlare 控制台；普通用户只经 owner-scoped API 管理自己的 Zone、域名、源站和 CDN 规则，Pages owner 链路另行建设 |
 
 ---
 

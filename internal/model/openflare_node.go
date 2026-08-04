@@ -10,6 +10,8 @@ import (
 // OpenFlareNode stores an edge, relay, or tunnel client node.
 type OpenFlareNode struct {
 	ID                        uint       `json:"id" gorm:"primaryKey;autoIncrement"`
+	NodeGroupID               *uint      `json:"node_group_id,omitempty" gorm:"index"`
+	MonthlyBytesLimit         int64      `json:"monthly_bytes_limit" gorm:"not null;default:0"`
 	NodeID                    string     `json:"node_id" gorm:"uniqueIndex;size:64;not null"`
 	Name                      string     `json:"name" gorm:"size:128;not null"`
 	IP                        string     `json:"ip" gorm:"size:64;not null;default:''"`

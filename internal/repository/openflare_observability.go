@@ -320,7 +320,7 @@ func upsertOpenFlareNodeSystemProfileTx(tx *gorm.DB, record *model.OpenFlareNode
 			"total_disk_bytes",
 			"uptime_seconds",
 			"reported_at",
-			"updated_at",
+			repositoryUpdatedAtColumn,
 		}),
 	}).Create(record).Error
 }

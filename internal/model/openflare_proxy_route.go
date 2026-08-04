@@ -11,6 +11,7 @@ import (
 // 域名与证书仅通过 of_zone_domains 关联，不再持久化在本表。
 type ProxyRoute struct {
 	ID                   uint         `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID              uint64       `json:"owner_id" gorm:"not null;default:0;index"`
 	SiteName             string       `json:"site_name" gorm:"size:255;not null;default:''"`
 	OriginID             *uint        `json:"origin_id" gorm:"index"`
 	OriginURL            string       `json:"origin_url" gorm:"size:2048;not null"`

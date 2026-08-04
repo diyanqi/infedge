@@ -14,6 +14,7 @@ import (
 	ofgeoip "github.com/Rain-kl/Wavelet/internal/apps/openflare/geoip"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
+	"github.com/Rain-kl/Wavelet/pkg/protocol"
 )
 
 const (
@@ -220,7 +221,16 @@ func buildAgentSettings(ctx context.Context, node *model.OpenFlareNode, updateNo
 		UpdateChannel:           updateChannel,
 		UpdateTag:               strings.TrimSpace(updateTag),
 		RestartOpenrestyNow:     restartOpenrestyNow,
+		TrafficQuota:            trafficQuota(ctx, node),
 	}
+}
+
+func trafficQuota(ctx context.Context, node *model.OpenFlareNode) *protocol.TrafficQuota {
+	quota, err := repository.BuildNodeTrafficQuota(ctx, node, time.Now())
+	if err != nil {
+		return nil
+	}
+	return quota
 }
 
 func collectHeartbeatChanges(previous *model.OpenFlareNode, current *model.OpenFlareNode) map[string]any {

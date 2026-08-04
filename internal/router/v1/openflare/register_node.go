@@ -6,6 +6,7 @@ package openflare
 import (
 	"github.com/Rain-kl/Wavelet/internal/apps/openflare/apiutil"
 	"github.com/Rain-kl/Wavelet/internal/apps/openflare/node"
+	"github.com/Rain-kl/Wavelet/internal/apps/openflare/node_group"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,5 +26,10 @@ func registerNodeRoutes(apiGroup *gin.RouterGroup) {
 		nodeRoute.POST("/:id/force-sync", node.RequestForceSyncHandler)
 		nodeRoute.GET("/:id/observability", node.GetObservabilityHandler)
 		nodeRoute.POST("/:id/observability/cleanup", node.CleanupHealthEventsHandler)
+	}
+	nodeGroupRoute := apiGroup.Group("/node-groups")
+	nodeGroupRoute.Use(apiutil.AdminMiddlewares()...)
+	{
+		node_group.RegisterRoutes(nodeGroupRoute)
 	}
 }

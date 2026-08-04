@@ -167,7 +167,7 @@ func (r *Runner) performHeartbeatCycle(ctx context.Context, nodeID string, start
 
 // Apply applies the provided agent settings and reports whether the heartbeat interval changed.
 func (r *Runner) Apply(settings *protocol.AgentSettings) bool {
-	return r.applySettings(settings)
+	return r.applySettings(context.Background(), settings)
 }
 
 // RestartOpenrestyIfNeeded restarts OpenResty when a server-requested restart is pending.
@@ -294,7 +294,7 @@ func (r *Runner) handleWebSocketMessage(ctx context.Context, message protocol.WS
 			slog.Debug("agent ws settings decode failed", "error", err)
 			return false, nil
 		}
-		changed := r.applySettings(&settings)
+		changed := r.applySettings(ctx, &settings)
 		r.tryRestartOpenresty(ctx)
 		edgeheartbeat.TryAutoUpdate(ctx, r.HeartbeatCycle.Updater, agentheartbeat.AgentSettingsToAutoUpdate(&settings), "agent")
 		if !r.websocketUpgradeEnabled {
@@ -385,7 +385,7 @@ func (r *Runner) hasAccessToken() bool {
 	return strings.TrimSpace(r.Config.AccessToken) != ""
 }
 
-func (r *Runner) applySettings(settings *protocol.AgentSettings) bool {
+func (r *Runner) applySettings(ctx context.Context, settings *protocol.AgentSettings) bool {
 	if settings == nil {
 		return false
 	}
@@ -403,6 +403,15 @@ func (r *Runner) applySettings(settings *protocol.AgentSettings) bool {
 	}
 	r.websocketUpgradeEnabled = settings.WebsocketUpgradeEnabled
 	r.restartOpenrestyNow = settings.RestartOpenrestyNow
+	if settings.TrafficQuota != nil {
+		if applier, ok := r.RuntimeManager.(interface {
+			ApplyTrafficQuota(context.Context, *protocol.TrafficQuota) error
+		}); ok {
+			if err := applier.ApplyTrafficQuota(ctx, settings.TrafficQuota); err != nil {
+				slog.Error("agent traffic quota update failed", "error", err)
+			}
+		}
+	}
 	return changed
 }
 

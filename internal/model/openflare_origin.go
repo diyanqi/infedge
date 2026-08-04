@@ -10,6 +10,7 @@ import (
 // Origin OpenFlare 源站实体。
 type Origin struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID   uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Name      string    `json:"name" gorm:"size:255;not null"`
 	Address   string    `json:"address" gorm:"uniqueIndex;size:255;not null"`
 	Remark    string    `json:"remark" gorm:"size:255"`

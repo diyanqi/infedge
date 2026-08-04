@@ -4,6 +4,12 @@
 
 OpenFlare Server 是 Gin + GORM 单体控制面，负责管理端 UI、管理 API、Agent API、配置渲染、版本发布、数据存储与聚合查询。
 
+## Docker 镜像自动迁移数据库
+
+新版 Server Docker 镜像在 `all`（默认镜像）或 `api`（后端镜像）启动服务前，会自动执行关系数据库和已启用的 ClickHouse Goose 迁移。迁移 SQL 已嵌入 Server 二进制，不需要在容器中挂载源码或单独运行迁移脚本。
+
+首次启动会创建数据库结构、默认数据以及本次版本新增的表；后续重启会依据 Goose 版本表跳过已经完成的迁移，因此可以直接使用原有数据卷滚动升级。生产环境升级前仍建议先备份 PostgreSQL、SQLite 和 ClickHouse 数据。
+
 > [!IMPORTANT]
 > **关于外部依赖**：
 > OpenFlare 系统内建了对后台异步任务（Asynq 框架）及海量节点日志分析与度量指标（观测面板）的支持。因此，**无论采用何种部署模式，系统都必须依赖 Redis（或 Valkey）与 ClickHouse 的运行**。各个部署方案的主要差异在于主关系型数据库的选择（SQLite vs PostgreSQL）以及是否启用链路追踪服务（Jaeger）。

@@ -116,6 +116,8 @@ definitions:
         type: integer
       restart_openresty_now:
         type: boolean
+      traffic_quota:
+        $ref: '#/definitions/github_com_Rain-kl_Wavelet_pkg_protocol.TrafficQuota'
       update_channel:
         type: string
       update_now:
@@ -664,6 +666,8 @@ definitions:
         type: string
       logged_at_unix:
         type: integer
+      owner_id:
+        type: integer
       path:
         type: string
       remote_addr:
@@ -770,6 +774,25 @@ definitions:
         type: integer
       total_size:
         type: integer
+    type: object
+  github_com_Rain-kl_Wavelet_pkg_protocol.TrafficQuota:
+    properties:
+      group_id:
+        type: integer
+      group_limit_bytes:
+        type: integer
+      group_remaining_bytes:
+        type: integer
+      high_speed_limit_bytes:
+        type: integer
+      remaining_bytes:
+        type: integer
+      throttle_bytes_per_sec:
+        type: integer
+      users:
+        additionalProperties:
+          $ref: '#/definitions/protocol.UserTrafficQuota'
+        type: object
     type: object
   github_com_Rain-kl_Wavelet_pkg_protocol.WAFIPGroup:
     properties:
@@ -1037,6 +1060,8 @@ definitions:
         type: string
       created_by:
         type: string
+      created_by_user_id:
+        type: integer
       id:
         type: string
       is_active:
@@ -1181,8 +1206,12 @@ definitions:
         type: string
       last_seen_at:
         type: string
+      monthly_bytes_limit:
+        type: integer
       name:
         type: string
+      node_group_id:
+        type: integer
       node_id:
         type: string
       node_type:
@@ -1218,6 +1247,23 @@ definitions:
       updated_at:
         type: string
       version:
+        type: string
+    type: object
+  model.OpenFlareNodeGroup:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      monthly_bytes_limit:
+        type: integer
+      name:
+        type: string
+      nodes:
+        items:
+          $ref: '#/definitions/model.OpenFlareNode'
+        type: array
+      updated_at:
         type: string
     type: object
   model.OpenFlareNodeSystemProfile:
@@ -1259,6 +1305,67 @@ definitions:
         type: string
       value:
         type: string
+    type: object
+  model.Origin:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      owner_id:
+        type: integer
+      remark:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.PaymentChannel:
+    properties:
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      gateway:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      pid:
+        type: string
+      sort:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  model.PaymentOrder:
+    properties:
+      amount_fen:
+        type: integer
+      channel_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      order_no:
+        type: string
+      paid_at:
+        type: string
+      plan_id:
+        type: integer
+      status:
+        type: string
+      trade_no:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
     type: object
   model.PushChannel:
     properties:
@@ -1365,6 +1472,39 @@ definitions:
         type: string
       task_type:
         type: string
+      updated_at:
+        type: string
+    type: object
+  model.SubscriptionPlan:
+    properties:
+      billing_months:
+        type: integer
+      created_at:
+        type: string
+      daily_publish_limit:
+        type: integer
+      description:
+        type: string
+      enabled:
+        type: boolean
+      high_speed_bytes:
+        type: integer
+      id:
+        type: integer
+      max_origins:
+        type: integer
+      max_pages:
+        type: integer
+      max_routes:
+        type: integer
+      max_zones:
+        type: integer
+      name:
+        type: string
+      price_fen:
+        type: integer
+      throttle_bytes_per_sec:
+        type: integer
       updated_at:
         type: string
     type: object
@@ -1593,6 +1733,27 @@ definitions:
     - UploadStatusPending
     - UploadStatusUsed
     - UploadStatusDeleted
+  model.UserSubscription:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: integer
+      plan:
+        $ref: '#/definitions/model.SubscriptionPlan'
+      plan_id:
+        type: integer
+      starts_at:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
   model.Zone:
     properties:
       created_at:
@@ -1600,6 +1761,8 @@ definitions:
       domain:
         type: string
       id:
+        type: integer
+      owner_id:
         type: integer
       updated_at:
         type: string
@@ -1681,6 +1844,8 @@ definitions:
         type: string
       ip_manual_override:
         type: boolean
+      monthly_bytes_limit:
+        type: integer
       name:
         type: string
       node_type:
@@ -1762,6 +1927,8 @@ definitions:
         type: string
       latest_support_file_count:
         type: integer
+      monthly_bytes_limit:
+        type: integer
       name:
         type: string
       node_id:
@@ -1800,6 +1967,21 @@ definitions:
         type: string
       version:
         type: string
+    type: object
+  node_group.Input:
+    properties:
+      monthly_bytes_limit:
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 128
+        type: string
+      node_ids:
+        items:
+          type: integer
+        type: array
+    required:
+    - name
     type: object
   oauth.AuthSourceView:
     properties:
@@ -2891,6 +3073,19 @@ definitions:
       websocket_upgrade_enabled:
         type: boolean
     type: object
+  protocol.UserTrafficQuota:
+    properties:
+      allocated_rate_bytes_per_sec:
+        type: integer
+      high_speed_limit_bytes:
+        type: integer
+      remaining_bytes:
+        type: integer
+      throttle_bytes_per_sec:
+        type: integer
+      user_id:
+        type: integer
+    type: object
   proxy_route.CustomHeaderInput:
     properties:
       key:
@@ -3359,6 +3554,86 @@ definitions:
       uptime:
         type: string
     type: object
+  subscription.ChannelInput:
+    properties:
+      enabled:
+        type: boolean
+      gateway:
+        maxLength: 512
+        type: string
+      name:
+        maxLength: 128
+        type: string
+      pid:
+        maxLength: 128
+        type: string
+      secret_key:
+        maxLength: 255
+        type: string
+      sort:
+        type: integer
+    required:
+    - gateway
+    - name
+    - pid
+    type: object
+  subscription.CreateOrderRequest:
+    properties:
+      channel_id:
+        type: integer
+      plan_id:
+        type: integer
+    required:
+    - plan_id
+    type: object
+  subscription.CreateOrderResponse:
+    properties:
+      order:
+        $ref: '#/definitions/model.PaymentOrder'
+      payment_url:
+        type: string
+    type: object
+  subscription.PlanInput:
+    properties:
+      billing_months:
+        maximum: 24
+        minimum: 1
+        type: integer
+      daily_publish_limit:
+        minimum: 0
+        type: integer
+      description:
+        maxLength: 2000
+        type: string
+      enabled:
+        type: boolean
+      high_speed_bytes:
+        minimum: 0
+        type: integer
+      max_origins:
+        minimum: 0
+        type: integer
+      max_pages:
+        minimum: 0
+        type: integer
+      max_routes:
+        minimum: 0
+        type: integer
+      max_zones:
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 128
+        type: string
+      price_fen:
+        minimum: 0
+        type: integer
+      throttle_bytes_per_sec:
+        minimum: 0
+        type: integer
+    required:
+    - name
+    type: object
   system_config.CreateSystemConfigRequest:
     properties:
       description:
@@ -3386,6 +3661,9 @@ definitions:
     type: object
   system_config.TestSMTPRequest:
     properties:
+      smtp_from_email:
+        maxLength: 255
+        type: string
       smtp_host:
         maxLength: 255
         type: string
@@ -7052,6 +7330,936 @@ paths:
       summary: 获取公共配置
       tags:
       - config
+  /api/v1/custom/admin/payment/channels:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.PaymentChannel'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取管理端支付渠道
+      tags:
+      - custom-subscription
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 渠道参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.ChannelInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PaymentChannel'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建易支付渠道
+      tags:
+      - custom-subscription
+  /api/v1/custom/admin/payment/channels/{id}:
+    delete:
+      parameters:
+      - description: 渠道 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除易支付渠道
+      tags:
+      - custom-subscription
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 渠道 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 渠道参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.ChannelInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.PaymentChannel'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新易支付渠道
+      tags:
+      - custom-subscription
+  /api/v1/custom/admin/plans:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.SubscriptionPlan'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取管理端套餐列表
+      tags:
+      - custom-subscription
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 套餐参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.PlanInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SubscriptionPlan'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建套餐
+      tags:
+      - custom-subscription
+  /api/v1/custom/admin/plans/{id}:
+    delete:
+      parameters:
+      - description: 套餐 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除套餐
+      tags:
+      - custom-subscription
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 套餐 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 套餐参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.PlanInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SubscriptionPlan'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新套餐
+      tags:
+      - custom-subscription
+  /api/v1/custom/orders:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.PaymentOrder'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的支付订单
+      tags:
+      - custom-subscription
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/subscription.CreateOrderResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建套餐订单
+      tags:
+      - custom-subscription
+  /api/v1/custom/payment/channels:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.PaymentChannel'
+                  type: array
+              type: object
+      summary: 获取公开支付渠道
+      tags:
+      - custom-subscription
+  /api/v1/custom/plans:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.SubscriptionPlan'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Any'
+      summary: 获取公开套餐列表
+      tags:
+      - custom-subscription
+  /api/v1/custom/resources/origins:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Origin'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的源站列表
+      tags:
+      - custom-resources
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 源站参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/origin.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Origin'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建我的源站
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/origins/{id}/delete:
+    post:
+      parameters:
+      - description: 源站 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除我的源站
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/origins/{id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 源站 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 源站参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/origin.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Origin'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的源站
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/proxy-routes:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/proxy_route.View'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 CDN 规则
+      tags:
+      - custom-resources
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 规则参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/proxy_route.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/proxy_route.View'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建我的 CDN 规则
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/proxy-routes/{id}:
+    get:
+      parameters:
+      - description: 规则 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/proxy_route.View'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 CDN 规则详情
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/proxy-routes/{id}/delete:
+    post:
+      parameters:
+      - description: 规则 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除我的 CDN 规则
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/proxy-routes/{id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 规则 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 规则参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/proxy_route.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/proxy_route.View'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的 CDN 规则
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/publish:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ConfigVersion'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 发布全站配置
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/zone.ListItem'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 Zone 列表
+      tags:
+      - custom-resources
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone 参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Zone'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建我的 Zone
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones/{id}:
+    get:
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/zone.Overview'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 Zone 详情
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones/{id}/delete:
+    post:
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除我的 Zone
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones/{id}/domains:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 域名参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.DomainInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ZoneDomain'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 添加我的域名
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones/{id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Zone 参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Zone'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的 Zone
+      tags:
+      - custom-resources
+  /api/v1/custom/subscription:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UserSubscription'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的套餐
+      tags:
+      - custom-subscription
   /api/v1/d/access-logs:
     get:
       description: 分页返回 OpenFlare 访问日志，支持按节点、IP、主机与路径筛选，需要管理员权限
@@ -8178,6 +9386,138 @@ paths:
       summary: 更新 DNS 账号
       tags:
       - openflare-tls
+  /api/v1/d/node-groups:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OpenFlareNodeGroup'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取节点组列表
+      tags:
+      - openflare-node-group
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 节点组参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/node_group.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OpenFlareNodeGroup'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建节点组
+      tags:
+      - openflare-node-group
+  /api/v1/d/node-groups/{id}:
+    delete:
+      parameters:
+      - description: 节点组 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除节点组
+      tags:
+      - openflare-node-group
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 节点组 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 节点组参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/node_group.Input'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OpenFlareNodeGroup'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新节点组
+      tags:
+      - openflare-node-group
   /api/v1/d/nodes:
     get:
       description: 返回所有节点及最新配置下发记录，需要管理员权限
@@ -12482,6 +13822,30 @@ paths:
       summary: 获取已上传文件
       tags:
       - upload
+  /payment/easy-pay/notify/{channel_id}:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - description: 渠道 ID
+        in: path
+        name: channel_id
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: success
+          schema:
+            type: string
+        "400":
+          description: fail
+          schema:
+            type: string
+      summary: 接收易支付回调
+      tags:
+      - custom-subscription
   /robots.txt:
     get:
       description: 根据系统配置决定是否允许搜索引擎检索，并返回相应的 robots.txt 文件内容

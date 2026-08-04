@@ -33,6 +33,7 @@ import type {
 const nodeSchema = z
   .object({
     node_type: z.enum(['edge_node', 'tunnel_relay', 'tunnel_client']),
+    monthly_bytes_limit: z.string(),
     name: z.string().trim().min(1, '请输入节点名称').max(255),
     ip: z.string(),
     ip_manual_override: z.boolean(),
@@ -76,6 +77,7 @@ type NodeFormValues = z.infer<typeof nodeSchema>;
 
 const defaultForm: NodeFormValues = {
   node_type: 'edge_node',
+  monthly_bytes_limit: '0',
   name: '',
   ip: '',
   ip_manual_override: false,
@@ -93,6 +95,7 @@ function buildFormValues(node?: NodeItem | null): NodeFormValues {
 
   return {
     node_type: node.node_type,
+    monthly_bytes_limit: String(node.monthly_bytes_limit || 0),
     name: node.name,
     ip: node.ip,
     ip_manual_override: node.ip_manual_override,
@@ -115,6 +118,7 @@ function buildFormValues(node?: NodeItem | null): NodeFormValues {
 function toPayload(form: NodeFormValues): NodeMutationPayload {
   const base: NodeMutationPayload = {
     node_type: form.node_type,
+    monthly_bytes_limit: Number(form.monthly_bytes_limit),
     name: form.name.trim(),
     ip: form.ip.trim(),
     ip_manual_override: form.ip_manual_override,
@@ -235,6 +239,18 @@ export function NodeEditorDialog({
                 {form.formState.errors.ip.message}
               </p>
             ) : null}
+          </div>
+
+          <div className='space-y-2'>
+            <Label htmlFor='node-monthly-bytes'>
+              节点月流量上限（字节，0 为不限制）
+            </Label>
+            <Input
+              id='node-monthly-bytes'
+              type='number'
+              min='0'
+              {...form.register('monthly_bytes_limit')}
+            />
           </div>
 
           <div className='flex items-center justify-between rounded-lg border px-3 py-2'>

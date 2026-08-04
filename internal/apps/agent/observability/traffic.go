@@ -19,6 +19,7 @@ import (
 
 type accessLogRecord struct {
 	Timestamp     string  `json:"ts"`
+	OwnerID       uint64  `json:"owner_id"`
 	Host          string  `json:"host"`
 	RemoteAddr    string  `json:"remote_addr"`
 	Path          string  `json:"path"`
@@ -144,6 +145,7 @@ func (aggregate *trafficAggregate) consume(line []byte) {
 
 	aggregate.logs = append(aggregate.logs, protocol.NodeAccessLog{
 		LoggedAtUnix:  record.Timestamp.Unix(),
+		OwnerID:       record.OwnerID,
 		RemoteAddr:    strings.TrimSpace(record.RemoteAddr),
 		Host:          strings.TrimSpace(record.Host),
 		Path:          normalizeAccessLogPath(record.Path),
@@ -158,6 +160,7 @@ func (aggregate *trafficAggregate) consume(line []byte) {
 
 type parsedAccessLogRecord struct {
 	Timestamp     time.Time
+	OwnerID       uint64
 	Host          string
 	RemoteAddr    string
 	Path          string
@@ -192,6 +195,7 @@ func parseJSONAccessLogRecord(raw string) (parsedAccessLogRecord, bool) {
 	}
 	return parsedAccessLogRecord{
 		Timestamp:     timestamp,
+		OwnerID:       record.OwnerID,
 		Host:          strings.TrimSpace(record.Host),
 		RemoteAddr:    strings.TrimSpace(record.RemoteAddr),
 		Path:          normalizeAccessLogPath(record.Path),

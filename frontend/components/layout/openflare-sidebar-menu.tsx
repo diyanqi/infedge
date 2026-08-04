@@ -22,6 +22,7 @@ import type { OpenFlareNavGroup } from '@/lib/navigation/openflare-nav';
 import {
   matchesNavPath,
   openflareSidebarNav,
+  ordinaryUserNav,
   isNavGroupActive,
 } from '@/lib/navigation/openflare-nav';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -105,8 +106,10 @@ function SidebarNavGroupMenuItem({
 
 export function OpenFlareSidebarMenu({
   onNavigate,
+  isAdmin = false,
 }: {
   onNavigate?: () => void;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const { config } = usePublicConfig();
@@ -114,10 +117,13 @@ export function OpenFlareSidebarMenu({
     () => parseMenuDisplayConfig(config?.menu_display_config),
     [config],
   );
+  const entries = isAdmin
+    ? openflareSidebarNav
+    : ordinaryUserNav.map((item) => ({ kind: 'item' as const, ...item }));
 
   return (
     <SidebarMenu className='gap-1'>
-      {openflareSidebarNav.map((entry) => {
+      {entries.map((entry) => {
         if (entry.kind === 'group') {
           const filteredItems = entry.items.filter(
             (item) => displayConfig[item.url] !== false,

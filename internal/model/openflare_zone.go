@@ -15,6 +15,7 @@ const (
 // Zone OpenFlare 注册根域实体。
 type Zone struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID   uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Domain    string    `json:"domain" gorm:"uniqueIndex:idx_of_zones_domain;size:255;not null"`
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`

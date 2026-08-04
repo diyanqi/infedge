@@ -25,6 +25,7 @@ const (
 	ConfigKeySMTPHost                         = "smtp_host"                           // SMTP 服务器地址
 	ConfigKeySMTPPort                         = "smtp_port"                           // SMTP 端口
 	ConfigKeySMTPUsername                     = "smtp_username"                       // SMTP 账户
+	ConfigKeySMTPFromEmail                    = "smtp_from_email"                     // SMTP 发件邮箱
 	ConfigKeySMTPPassword                     = "smtp_password"                       // SMTP 访问凭证
 	ConfigKeyEmailLoginVerificationEnabled    = "email_login_verification_enabled"    // 是否启用邮箱登录验证
 	ConfigKeyEmailRegisterVerificationEnabled = "email_register_verification_enabled" // 是否启用邮箱注册验证

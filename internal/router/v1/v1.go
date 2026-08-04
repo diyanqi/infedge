@@ -10,7 +10,7 @@ import (
 )
 
 // RegisterV1Routes registers all routes under API V1.
-func RegisterV1Routes(apiV1Router *gin.RouterGroup, apiGroup *gin.RouterGroup) {
+func RegisterV1Routes(apiV1Router *gin.RouterGroup, apiGroup *gin.RouterGroup, roots ...*gin.Engine) {
 	// 1. User & Public routes (OAuth, User, Upload, CAPTCHA, Health, Config)
 	RegisterUserRoutes(apiV1Router, apiGroup)
 
@@ -22,5 +22,5 @@ func RegisterV1Routes(apiV1Router *gin.RouterGroup, apiGroup *gin.RouterGroup) {
 	ofrouter.RegisterRoutes(apiV1Router)
 
 	// 4. Custom business routes (example only)
-	RegisterCustomRoutes()
+	RegisterCustomRoutes(apiV1Router, roots...)
 }

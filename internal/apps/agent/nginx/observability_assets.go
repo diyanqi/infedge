@@ -9,8 +9,13 @@ import "github.com/Rain-kl/Wavelet/internal/apps/agent/protocol"
 const openRestyObservabilityInitLua = `return
 `
 
-// log.lua no longer accumulates business counters (access.log is the authority).
-const openRestyObservabilityLogLua = `return
+// log.lua releases the per-owner active request slot used by the quota limiter.
+const openRestyObservabilityLogLua = `local dict = ngx.shared.openflare_traffic_quota
+local key = ngx.ctx.openflare_traffic_active_key
+if dict and key then
+    dict:incr(key, -1, 0, 2)
+end
+return
 `
 
 // read.lua exposes stub_status-style connection gauges as JSON.

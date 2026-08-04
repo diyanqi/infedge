@@ -9,6 +9,7 @@ import {
   ScrollText,
   Server,
   ShieldCheck,
+  Package,
 } from 'lucide-react';
 
 export interface OpenFlareNavItem {
@@ -90,6 +91,11 @@ export const openflareSidebarNav: OpenFlareSidebarNavEntry[] = [
   { kind: 'item', title: '版本发布', url: '/config-versions', icon: GitBranch },
   { kind: 'item', title: '访问日志', url: '/access-logs', icon: ScrollText },
   { kind: 'item', title: '性能调优', url: '/performance', icon: Gauge },
+];
+
+export const ordinaryUserNav: OpenFlareNavItem[] = [
+  { title: '我的资源', url: '/resources', icon: Globe },
+  { title: '套餐订阅', url: '/plans', icon: Package },
 ];
 
 /** 扁平菜单项（供路由判断等逻辑复用） */

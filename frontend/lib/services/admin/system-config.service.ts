@@ -36,6 +36,7 @@ export class AdminSystemConfigService extends BaseService {
     smtp_host: string;
     smtp_port: number;
     smtp_username: string;
+    smtp_from_email: string;
     smtp_password: string;
     to: string;
   }): Promise<{ success: boolean; log: string; error: string }> {

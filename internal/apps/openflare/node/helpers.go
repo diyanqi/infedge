@@ -258,6 +258,7 @@ func buildNodeView(node *model.OpenFlareNode) *View {
 		AutoUpdateEnabled:         node.AutoUpdateEnabled,
 		UpdateRequested:           node.UpdateRequested,
 		NodeType:                  node.NodeType,
+		MonthlyBytesLimit:         node.MonthlyBytesLimit,
 		RelayBindPort:             node.RelayBindPort,
 		RelayVhostHTTPPort:        node.RelayVhostHTTPPort,
 		RelayAgentAccessAddr:      node.RelayAgentAccessAddr,

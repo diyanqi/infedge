@@ -15,6 +15,9 @@ type HeartbeatResult = pkgprotocol.HeartbeatResult
 // AgentSettings is an alias for pkgprotocol.AgentSettings.
 type AgentSettings = pkgprotocol.AgentSettings
 
+// TrafficQuota is an alias for the agent traffic quota policy.
+type TrafficQuota = pkgprotocol.TrafficQuota
+
 // WSMessage is an alias for pkgprotocol.WSMessage.
 type WSMessage = pkgprotocol.WSMessage
 

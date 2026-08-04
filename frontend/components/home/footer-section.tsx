@@ -28,11 +28,11 @@ export const FooterSection = React.memo(function FooterSection({
                 OF
               </div>
               <span className='text-2xl font-bold tracking-tight text-foreground'>
-                OpenFlare
+                无尽边缘
               </span>
             </Link>
             <p className='text-muted-foreground text-base leading-relaxed max-w-sm'>
-              开源边缘节点与反向代理管理平台。基于 Go + React 构建，统一管理
+              边缘节点与反向代理管理平台。由 Rain-kl/OpenFlare 二开，统一管理
               OpenResty 节点、网站规则与 WAF 配置。
             </p>
             <div className='flex gap-4 pt-2'>

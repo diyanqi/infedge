@@ -70,6 +70,9 @@ func PersistHeartbeatObservability(ctx context.Context, nodeID string, payload N
 	if err := persistNodeAccessLogs(ctx, nodeID, accessLogRecords, reportedAt); err != nil {
 		zap.L().Error("persist heartbeat access logs failed", zap.String("node_id", nodeID), zap.Error(err))
 	}
+	if err := repository.AddUserTrafficUsage(ctx, accessLogRecords); err != nil {
+		zap.L().Error("persist user traffic usage failed", zap.String("node_id", nodeID), zap.Error(err))
+	}
 }
 
 func persistBufferedObservability(ctx context.Context, nodeID string, records []BufferedObservabilityRecord, reportedAt time.Time) error {
@@ -193,6 +196,7 @@ func buildNodeAccessLogRecords(nodeID string, direct []NodeAccessLog, buffered [
 			}
 			record := &model.OpenFlareAccessLog{
 				NodeID:        nodeID,
+				OwnerID:       item.OwnerID,
 				LoggedAt:      timeFromUnix(item.LoggedAtUnix, reportedAt),
 				RemoteAddr:    strings.TrimSpace(item.RemoteAddr),
 				Region:        "",

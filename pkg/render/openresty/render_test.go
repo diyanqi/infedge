@@ -548,6 +548,7 @@ func TestRenderRouteConfigAppliesDefaultLimits(t *testing.T) {
 	doc := Document{
 		Routes: []Route{{
 			SiteName:  "example.com",
+			OwnerID:   42,
 			Domains:   []string{"example.com"},
 			Enabled:   true,
 			OriginURL: "http://127.0.0.1:8080",
@@ -573,6 +574,24 @@ func TestRenderRouteConfigAppliesDefaultLimits(t *testing.T) {
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("expected %q in route config, got:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestRenderMainConfigMapsHostsToOwners(t *testing.T) {
+	doc := Document{Routes: []Route{{
+		OwnerID:   42,
+		Domains:   []string{"WWW.Example.com"},
+		OriginURL: "http://127.0.0.1:8080",
+	}}}
+	mainConfig := RenderMainConfig(doc)
+	for _, want := range []string{
+		"map $host $openflare_owner_id",
+		`"www.example.com" 42;`,
+		`"owner_id":$openflare_owner_id`,
+	} {
+		if !strings.Contains(mainConfig, want) {
+			t.Fatalf("expected %q in main config, got:\n%s", want, mainConfig)
 		}
 	}
 }

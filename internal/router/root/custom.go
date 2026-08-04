@@ -5,10 +5,14 @@
 package root
 
 import (
+	"github.com/Rain-kl/Wavelet/internal/apps/openflare/subscription"
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterCustomRootRoutes registers custom business routes that belong to the root path.
-func RegisterCustomRootRoutes(_ *gin.Engine) {
-	// Add custom root routes here
+func RegisterCustomRootRoutes(r *gin.Engine) {
+	// Payment callbacks are registered by the v1 custom route setup. This root
+	// hook intentionally remains available for future webhook integrations.
+	_ = subscription.HandleNotify
+	_ = r
 }

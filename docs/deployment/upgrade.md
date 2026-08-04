@@ -13,7 +13,9 @@ docker compose pull
 docker compose up
 ```
 
-如果是源码部署，重新启动 Server 后确认日志中没有数据库迁移或启动错误。
+新版镜像会在 Server 进程监听端口前自动执行关系数据库迁移，并在启用 ClickHouse 时执行 ClickHouse 迁移。首次启动会应用全部待执行迁移，后续启动由 Goose 版本表保证幂等；请确认启动日志中出现迁移成功且没有数据库错误。
+
+如果是源码部署，重新启动 Server 后同样会执行上述自动迁移流程。
 
 ## Agent 升级
 

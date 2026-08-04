@@ -18,6 +18,9 @@ var openRestyWAFIPGroupsLua string
 //go:embed resty/ipmatcher.lua
 var openRestyIPMatcherLua string
 
+//go:embed traffic_quota.lua
+var openRestyTrafficQuotaLua string
+
 const openRestyWAFCheckLua = `local source = debug.getinfo(1, "S").source or ""
 if string.sub(source, 1, 1) == "@" then
     local script_path = string.sub(source, 2)
@@ -38,5 +41,6 @@ func ManagedWAFLuaFiles() []protocol.SupportFile {
 		{Path: "waf/check.lua", Content: openRestyWAFCheckLua},
 		// resty.ipmatcher under lua_package_path <luaDir>/?.lua
 		{Path: "resty/ipmatcher.lua", Content: openRestyIPMatcherLua},
+		{Path: "traffic/quota.lua", Content: openRestyTrafficQuotaLua},
 	}
 }

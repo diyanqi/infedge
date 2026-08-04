@@ -11,8 +11,8 @@ import { RobotsMeta } from '@/components/layout/robots-meta';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'OpenFlare',
-  description: 'OpenFlare 边缘节点与反向代理管理平台',
+  title: '无尽边缘',
+  description: '无尽边缘边缘节点与反向代理管理平台',
 };
 
 export default function RootLayout({

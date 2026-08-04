@@ -243,6 +243,55 @@ func PublishConfigVersion(ctx context.Context, createdBy string, force bool) (*m
 	return record, nil
 }
 
+// PublishForUser publishes the global configuration after enforcing the user's
+// daily entitlement and records the numeric user owner for auditing.
+func PublishForUser(ctx context.Context, userID uint64, createdBy string, force bool) (*model.ConfigVersion, error) {
+	plan, err := repository.GetActiveSubscription(ctx, userID, time.Now())
+	if err != nil || plan.Plan == nil || !plan.Plan.Enabled {
+		return nil, errors.New("请先选择有效套餐")
+	}
+	if plan.Plan.DailyPublishLimit <= 0 {
+		return publishForUserWithoutLimit(ctx, userID, createdBy, force)
+	}
+	start := time.Now()
+	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+	reserved, reserveErr := repository.ReserveUserPublish(ctx, userID, start, plan.Plan.DailyPublishLimit)
+	if reserveErr != nil {
+		return nil, reserveErr
+	}
+	if !reserved {
+		return nil, errors.New("已达到今日发布次数限制")
+	}
+	return publishForUserWithReservation(ctx, userID, createdBy, force, start)
+}
+
+func publishForUserWithoutLimit(ctx context.Context, userID uint64, createdBy string, force bool) (*model.ConfigVersion, error) {
+	version, err := PublishConfigVersion(ctx, createdBy, force)
+	if err != nil {
+		return nil, err
+	}
+	if err := repository.SetConfigVersionCreator(ctx, version.Version, userID); err != nil {
+		return nil, err
+	}
+	version.CreatedByUserID = userID
+	return version, nil
+}
+
+func publishForUserWithReservation(ctx context.Context, userID uint64, createdBy string, force bool, dayStart time.Time) (*model.ConfigVersion, error) {
+	version, publishErr := PublishConfigVersion(ctx, createdBy, force)
+	if publishErr != nil {
+		if releaseErr := repository.ReleaseUserPublish(ctx, userID, dayStart); releaseErr != nil {
+			return nil, errors.Join(publishErr, releaseErr)
+		}
+		return nil, publishErr
+	}
+	if err := repository.SetConfigVersionCreator(ctx, version.Version, userID); err != nil {
+		return nil, err
+	}
+	version.CreatedByUserID = userID
+	return version, nil
+}
+
 // ActivateConfigVersion activates an existing config version.
 func ActivateConfigVersion(ctx context.Context, versionStr string) (*model.ConfigVersion, error) {
 	version, err := repository.GetConfigVersionByVersion(ctx, versionStr)
@@ -414,7 +463,7 @@ func snapshotRouteScalarsEqual(left, right snapshotRoute) bool {
 }
 
 func snapshotRouteIdentityEqual(left, right snapshotRoute) bool {
-	return left.SiteName == right.SiteName
+	return left.SiteName == right.SiteName && left.OwnerID == right.OwnerID
 }
 
 func snapshotRouteOriginEqual(left, right snapshotRoute) bool {

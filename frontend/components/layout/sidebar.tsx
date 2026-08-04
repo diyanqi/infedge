@@ -53,6 +53,8 @@ import {
   FolderOpen,
   Layers,
   LogOut,
+  Package,
+  Boxes,
   Settings,
   ShieldCheck,
   Terminal,
@@ -75,6 +77,8 @@ const data = {
     { title: '系统日志', url: '/admin/logs', icon: Terminal },
     { title: '系统配置', url: '/admin/system', icon: ShieldCheck },
     { title: '系统设置', url: '/admin/settings', icon: Settings },
+    { title: '套餐与支付', url: '/admin/openflare/plans', icon: Package },
+    { title: '节点组流量', url: '/admin/openflare/node-groups', icon: Boxes },
   ],
   document: [
     {
@@ -345,7 +349,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {openflareSidebarNav.length > 0 && (
             <SidebarGroup className='py-0'>
               <SidebarGroupContent className='py-1'>
-                <OpenFlareSidebarMenu onNavigate={handleCloseSidebar} />
+                <OpenFlareSidebarMenu
+                  onNavigate={handleCloseSidebar}
+                  isAdmin={Boolean(user?.is_admin)}
+                />
               </SidebarGroupContent>
             </SidebarGroup>
           )}
@@ -422,6 +429,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <div className='border-t border-border/60 pt-3 text-[11px] leading-5 text-muted-foreground'>
             <div>Version {APP_VERSION}</div>
             {APP_BUILD_DATE && <div>Build At {APP_BUILD_DATE}</div>}
+            <div>无尽边缘 · 由 Rain-kl/OpenFlare 二开</div>
           </div>
         </SidebarFooter>
       </Sidebar>

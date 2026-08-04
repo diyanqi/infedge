@@ -109,6 +109,24 @@ func ListProxyRoutes(ctx context.Context) ([]*View, error) {
 	return buildProxyRouteViews(ctx, routes)
 }
 
+// ListOwnedProxyRoutes lists routes belonging to one ordinary user.
+func ListOwnedProxyRoutes(ctx context.Context, userID uint64) ([]*View, error) {
+	routes, err := repository.ListOwnedProxyRoutes(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return buildProxyRouteViews(ctx, routes)
+}
+
+// GetOwnedProxyRoute returns a route only when owned by the user.
+func GetOwnedProxyRoute(ctx context.Context, id uint, userID uint64) (*View, error) {
+	route, err := repository.GetOwnedProxyRouteByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	return buildProxyRouteView(ctx, route)
+}
+
 // GetProxyRoute 获取代理规则详情。
 func GetProxyRoute(ctx context.Context, id uint) (*View, error) {
 	route, err := repository.GetProxyRouteByID(ctx, id)
@@ -120,10 +138,15 @@ func GetProxyRoute(ctx context.Context, id uint) (*View, error) {
 
 // CreateProxyRoute 创建代理规则。
 func CreateProxyRoute(ctx context.Context, input Input) (*View, error) {
+	return createProxyRoute(ctx, 0, input)
+}
+
+func createProxyRoute(ctx context.Context, ownerID uint64, input Input) (*View, error) {
 	route, _, err := buildProxyRoute(ctx, nil, input)
 	if err != nil {
 		return nil, err
 	}
+	route.OwnerID = ownerID
 	if err = repository.WithProxyRouteTx(ctx, func(tx *gorm.DB) error {
 		if err := lockPagesProjectsForRouteMutation(tx, 0, route); err != nil {
 			return err
@@ -139,6 +162,11 @@ func CreateProxyRoute(ctx context.Context, input Input) (*View, error) {
 		return nil, err
 	}
 	return buildProxyRouteView(ctx, route)
+}
+
+// CreateOwnedProxyRoute creates a route with its owner in the same insert.
+func CreateOwnedProxyRoute(ctx context.Context, userID uint64, input Input) (*View, error) {
+	return createProxyRoute(ctx, userID, input)
 }
 
 // UpdateProxyRoute 更新代理规则。
@@ -167,6 +195,14 @@ func UpdateProxyRoute(ctx context.Context, id uint, input Input) (*View, error) 
 		return nil, err
 	}
 	return buildProxyRouteView(ctx, route)
+}
+
+// UpdateOwnedProxyRoute updates only a route owned by the user.
+func UpdateOwnedProxyRoute(ctx context.Context, id uint, userID uint64, input Input) (*View, error) {
+	if _, err := repository.GetOwnedProxyRouteByID(ctx, id, userID); err != nil {
+		return nil, err
+	}
+	return UpdateProxyRoute(ctx, id, input)
 }
 
 func mapProxyRoutePersistError(err error) error {
@@ -242,6 +278,14 @@ func DeleteProxyRoute(ctx context.Context, id uint) error {
 		return err
 	}
 	return repository.DeleteProxyRouteAndUnbind(ctx, id)
+}
+
+// DeleteOwnedProxyRoute deletes only a route owned by the user.
+func DeleteOwnedProxyRoute(ctx context.Context, id uint, userID uint64) error {
+	if _, err := repository.GetOwnedProxyRouteByID(ctx, id, userID); err != nil {
+		return err
+	}
+	return DeleteProxyRoute(ctx, id)
 }
 
 func buildProxyRoute(ctx context.Context, route *model.ProxyRoute, input Input) (*model.ProxyRoute, []model.ZoneDomain, error) {

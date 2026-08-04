@@ -28,14 +28,36 @@ type HeartbeatResult struct {
 
 // AgentSettings holds agent configuration settings.
 type AgentSettings struct {
-	HeartbeatInterval       int    `json:"heartbeat_interval"`
-	WebsocketUpgradeEnabled bool   `json:"websocket_upgrade_enabled"`
-	AutoUpdate              bool   `json:"auto_update"`
-	UpdateRepo              string `json:"update_repo"`
-	UpdateNow               bool   `json:"update_now"`
-	UpdateChannel           string `json:"update_channel"`
-	UpdateTag               string `json:"update_tag"`
-	RestartOpenrestyNow     bool   `json:"restart_openresty_now"`
+	HeartbeatInterval       int           `json:"heartbeat_interval"`
+	WebsocketUpgradeEnabled bool          `json:"websocket_upgrade_enabled"`
+	AutoUpdate              bool          `json:"auto_update"`
+	UpdateRepo              string        `json:"update_repo"`
+	UpdateNow               bool          `json:"update_now"`
+	UpdateChannel           string        `json:"update_channel"`
+	UpdateTag               string        `json:"update_tag"`
+	RestartOpenrestyNow     bool          `json:"restart_openresty_now"`
+	TrafficQuota            *TrafficQuota `json:"traffic_quota,omitempty"`
+}
+
+// TrafficQuota is the server-calculated monthly traffic policy for one node.
+// RemainingBytes is the shared remaining quota after aggregating node/group usage.
+type TrafficQuota struct {
+	RemainingBytes      int64                       `json:"remaining_bytes"`
+	HighSpeedLimitBytes int64                       `json:"high_speed_limit_bytes"`
+	ThrottleBytesPerSec int64                       `json:"throttle_bytes_per_sec"`
+	GroupID             uint                        `json:"group_id,omitempty"`
+	GroupLimitBytes     int64                       `json:"group_limit_bytes,omitempty"`
+	GroupRemainingBytes int64                       `json:"group_remaining_bytes,omitempty"`
+	Users               map[string]UserTrafficQuota `json:"users,omitempty"`
+}
+
+// UserTrafficQuota is the monthly policy for one subscribed user.
+type UserTrafficQuota struct {
+	UserID                   uint64 `json:"user_id"`
+	RemainingBytes           int64  `json:"remaining_bytes"`
+	HighSpeedLimitBytes      int64  `json:"high_speed_limit_bytes"`
+	ThrottleBytesPerSec      int64  `json:"throttle_bytes_per_sec"`
+	AllocatedRateBytesPerSec int64  `json:"allocated_rate_bytes_per_sec"`
 }
 
 // WSMessageType constants define WebSocket message types.
@@ -138,6 +160,7 @@ type NodeMetricSnapshot struct {
 // NodeAccessLog is an access log entry from agent (L1 business fact).
 type NodeAccessLog struct {
 	LoggedAtUnix  int64  `json:"logged_at_unix"`
+	OwnerID       uint64 `json:"owner_id,omitempty"`
 	RemoteAddr    string `json:"remote_addr"`
 	Host          string `json:"host"`
 	Path          string `json:"path"`

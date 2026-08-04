@@ -36,6 +36,7 @@ type ConfigVersion struct {
 	Checksum         string    `json:"checksum" gorm:"size:64;not null"`
 	IsActive         bool      `json:"is_active" gorm:"not null;default:false;index"`
 	CreatedBy        string    `json:"created_by" gorm:"size:64;not null"`
+	CreatedByUserID  uint64    `json:"created_by_user_id" gorm:"not null;default:0;index"`
 	CreatedAt        time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 

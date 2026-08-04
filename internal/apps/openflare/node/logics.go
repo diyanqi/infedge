@@ -42,6 +42,7 @@ type Input struct {
 	GeoLongitude          *float64 `json:"geo_longitude"`
 	GeoManualOverride     bool     `json:"geo_manual_override"`
 	NodeType              string   `json:"node_type"`
+	MonthlyBytesLimit     int64    `json:"monthly_bytes_limit"`
 	RelayBindPort         int      `json:"relay_bind_port"`
 	RelayVhostHTTPPort    int      `json:"relay_vhost_http_port"`
 	RelayAgentAccessAddr  string   `json:"relay_agent_access_addr"`
@@ -111,6 +112,7 @@ type View struct {
 	CreatedAt                 time.Time  `json:"created_at"`
 	UpdatedAt                 time.Time  `json:"updated_at"`
 	NodeType                  string     `json:"node_type"`
+	MonthlyBytesLimit         int64      `json:"monthly_bytes_limit"`
 	RelayBindPort             int        `json:"relay_bind_port"`
 	RelayVhostHTTPPort        int        `json:"relay_vhost_http_port"`
 	RelayAgentAccessAddr      string     `json:"relay_agent_access_addr"`
@@ -187,6 +189,7 @@ func CreateNode(ctx context.Context, input Input) (*View, error) {
 		Status:            nodeStatusPending,
 		AutoUpdateEnabled: input.AutoUpdateEnabled,
 		NodeType:          normalizeNodeType(input.NodeType),
+		MonthlyBytesLimit: max(input.MonthlyBytesLimit, 0),
 		CapabilitiesJSON:  "[]",
 	}
 	node.NodeID, err = newServerNodeID()
@@ -240,6 +243,7 @@ func UpdateNode(ctx context.Context, id uint, input Input) (*View, error) {
 	node.GeoLongitude = geoLongitude
 	node.GeoManualOverride = geoManualOverride
 	node.AutoUpdateEnabled = input.AutoUpdateEnabled
+	node.MonthlyBytesLimit = max(input.MonthlyBytesLimit, 0)
 	if node.NodeType == "tunnel_relay" {
 		node.RelayAgentAccessAddr = strings.TrimSpace(input.RelayAgentAccessAddr)
 		node.RelayClientAccessAddr = strings.TrimSpace(input.RelayClientAccessAddr)

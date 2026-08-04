@@ -257,6 +257,7 @@ func toAnalyticsNodeAccessLog(record *model.OpenFlareAccessLog) analyticsmodel.N
 	return analyticsmodel.NodeAccessLog{
 		ID:            record.ID,
 		NodeID:        record.NodeID,
+		OwnerID:       record.OwnerID,
 		LoggedAt:      record.LoggedAt,
 		RemoteAddr:    record.RemoteAddr,
 		Region:        record.Region,
@@ -290,6 +291,7 @@ func fromAnalyticsNodeAccessLogs(rows []analyticsmodel.NodeAccessLog) []*model.O
 		result[index] = &model.OpenFlareAccessLog{
 			ID:            row.ID,
 			NodeID:        row.NodeID,
+			OwnerID:       row.OwnerID,
 			LoggedAt:      row.LoggedAt,
 			RemoteAddr:    row.RemoteAddr,
 			Region:        row.Region,

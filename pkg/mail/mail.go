@@ -23,10 +23,11 @@ const (
 
 // Config represents SMTP mail configuration
 type Config struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	FromEmail string
 }
 
 // SendMail sends an HTML email using the provided config and message details
@@ -40,7 +41,11 @@ func SendMailHTML(ctx context.Context, cfg Config, to string, subject, body stri
 
 	// Header & MIME settings for HTML email
 	header := make(map[string]string)
-	header["From"] = cfg.Username
+	from := cfg.FromEmail
+	if from == "" {
+		from = cfg.Username
+	}
+	header["From"] = from
 	header["To"] = to
 	header["Subject"] = subject
 	header["MIME-Version"] = "1.0"
@@ -60,7 +65,7 @@ func SendMailHTML(ctx context.Context, cfg Config, to string, subject, body stri
 	}
 
 	// For standard port (587 / 25), use smtp.SendMail directly (handles STARTTLS automatically if server supports it)
-	err := smtp.SendMail(addr, auth, cfg.Username, []string{to}, []byte(message))
+	err := smtp.SendMail(addr, auth, from, []string{to}, []byte(message))
 	if err != nil {
 		return fmt.Errorf(errSendMailFailed, err)
 	}
@@ -95,7 +100,11 @@ func sendMailViaSSL(ctx context.Context, addr string, auth smtp.Auth, cfg Config
 	if err = client.Auth(auth); err != nil {
 		return fmt.Errorf(errSMTPAuthFailed, err)
 	}
-	if err = client.Mail(cfg.Username); err != nil {
+	from := cfg.FromEmail
+	if from == "" {
+		from = cfg.Username
+	}
+	if err = client.Mail(from); err != nil {
 		return fmt.Errorf(errSMTPMailCommandFailed, err)
 	}
 	if err = client.Rcpt(to); err != nil {
@@ -186,8 +195,12 @@ func SendMailWithLog(ctx context.Context, cfg Config, to string, subject, body s
 	}
 
 	// Mail command
-	logLine("C", "MAIL FROM:<%s>", cfg.Username)
-	if err = client.Mail(cfg.Username); err != nil {
+	from := cfg.FromEmail
+	if from == "" {
+		from = cfg.Username
+	}
+	logLine("C", "MAIL FROM:<%s>", from)
+	if err = client.Mail(from); err != nil {
 		logLine("Error", "MAIL FROM command failed: %v", err)
 		return logBuf.String(), err
 	}
@@ -212,7 +225,7 @@ func SendMailWithLog(ctx context.Context, cfg Config, to string, subject, body s
 
 	// Header & MIME settings for HTML email
 	header := make(map[string]string)
-	header["From"] = cfg.Username
+	header["From"] = from
 	header["To"] = to
 	header["Subject"] = subject
 	header["MIME-Version"] = "1.0"

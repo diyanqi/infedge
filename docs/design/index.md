@@ -30,6 +30,7 @@ OpenFlare 适合需要统一管理多台 OpenResty 代理节点的团队，具�
 | **Pages 静态托管** | 支持上传或从 Remote URL、公开 GitHub Release 同步预构建产物；GitHub latest 可定时检查并可选自动发布。不可变部署由边缘节点拉取并由 OpenResty 本地服务，支持回滚、API 反代与 SPA Fallback | [Pages 静态托管设计](./pages-design.md) / [Pages 使用指南](../guide/pages-usage.md) |
 | **TLS 证书自动续期** | 将证书显式绑定到 Zone 域名，并通过 ACME 协议向 Let's Encrypt 申请/续期证书 | [Zone 与域名资源设计](./zone-design.md) |
 | **多节点监控与观测** | 访问日志为业务流量唯一真相；Agent 只上报明细与主机读数，Server 统一聚合；与 Zone/看板对账 | [观测数据传输模型](./observability-transport-model.md) / [边缘可观测与业务流量统计](./observability-design.md) / [上报协议与表结构](./observability-data-model.md) / [系统架构](./architecture.md) |
+| **用户套餐与资源隔离** | 普通用户按套餐管理自己的 Zone、域名、源站和 CDN 规则，购买额度并受发布次数和流量策略约束；管理员维护套餐、支付渠道和节点组 | [用户套餐、资源隔离与流量配额设计](./subscription-multitenancy.md) |
 
 ---
 
@@ -59,7 +60,7 @@ OpenFlare 适合需要统一管理多台 OpenResty 代理节点的团队，具�
 
 ### 5. 系统与版本边界
 * **全局单一激活版本**：所有节点拉取并消费同一份全局激活配置。不进行按节点分组的差异化配置发布。
-* **单租户架构**：OpenFlare 仅供单团队在受信任的内部网络部署使用。采用单租户设计，不支持细粒度的多用户角色或多租户资源隔离。
+* **组织级控制面与用户资源隔离**：控制面仍属于一个组织，但支持普通用户按 `owner_id` 隔离自己的 CDN 资源；管理员拥有全局管理权限。
 * **外部基础设施依赖性**：Server 虽支持 SQLite 作为本地轻量关系数据库，但**系统必须强制依赖外部 Redis（或 Valkey）及 ClickHouse 实例**。Redis 用于处理分布式协调、后台异步队列（Asynq 框架）及系统级全局缓存；ClickHouse 用于接收海量节点访问日志与基础观测的异步 Flush。系统不支持完全脱离这两个组件运行。
 
 ---

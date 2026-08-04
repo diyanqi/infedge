@@ -168,6 +168,10 @@ graph TD
 
 ## 设计约束
 
+### 月流量配额下发
+
+Server 在 Agent 心跳响应的 `agent_settings.traffic_quota` 中下发当前自然月策略。未加入节点组的节点使用自身 `monthly_bytes_limit`；节点组按组内所有节点的访问日志汇总，使用节点组 `monthly_bytes_limit` 作为共享剩余额度。策略同时包含每个有效用户的高速额度、已用剩余字节和超额速率；用户超额速率按在线节点数分摊，并由 Agent 的共享字典按 owner 的并发请求分摊，从而近似约束用户全部节点的实时总速率。Agent 原子写入 `traffic_quota.json`，OpenResty Lua 每秒刷新策略，不触发配置重载。额度为 0 表示不限制，旧 Agent 忽略新增字段。
+
 为保证数据与控制链路的安全边界，Agent 代码编写与二次开发必须严格遵守以下工程约束：
 
 1. **零特权指令通道**：Server 绝对禁止向 Agent 传递任何任意 shell 命令或远程执行脚本（如 exec/eval 等）。所有系统控制原语（如启动、停止、重载、更新）必须硬编码在 Agent 二进制内部。

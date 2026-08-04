@@ -1,6 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@/contexts/user-context';
 import { LayoutDashboard, RefreshCw } from 'lucide-react';
 
 import { EmptyStateWithBorder } from '@/components/layout/empty';
@@ -25,11 +27,18 @@ import { getErrorMessage } from './nodes/components/node-utils';
 const dashboardQueryKey = ['openflare', 'dashboard', 'overview'];
 
 export default function OpenFlareDashboardPage() {
+  const router = useRouter();
+  const { user, loading } = useUser();
   const overviewQuery = useQuery({
     queryKey: dashboardQueryKey,
     queryFn: () => DashboardService.getOverview(),
     refetchInterval: 60_000,
   });
+
+  if (!loading && user && !user.is_admin) {
+    router.replace('/resources');
+    return null;
+  }
 
   const overview = overviewQuery.data;
 

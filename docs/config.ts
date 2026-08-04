@@ -137,7 +137,8 @@ function sidebarDesign(): DefaultTheme.SidebarItem[] {
         { text: '观测数据传输模型', link: 'observability-transport-model' },
         { text: '观测上报协议与表结构', link: 'observability-data-model' },
         { text: 'Uptime Kuma 监控同步设计', link: 'kuma-design' },
-        { text: '登录验证码设计', link: 'login-captcha' }
+        { text: '登录验证码设计', link: 'login-captcha' },
+        { text: '用户套餐与资源隔离', link: 'subscription-multitenancy' }
       ]
     }
   ]

@@ -44,6 +44,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('');
   const [smtpUsername, setSmtpUsername] = useState('');
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
   const [smtpPassword, setSmtpPassword] = useState('');
   const [smtpTestOpen, setSmtpTestOpen] = useState(false);
   const [smtpTestTo, setSmtpTestTo] = useState('');
@@ -58,6 +59,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
       setSmtpHost(configs['smtp_host']?.value || '');
       setSmtpPort(configs['smtp_port']?.value || '587');
       setSmtpUsername(configs['smtp_username']?.value || '');
+      setSmtpFromEmail(configs['smtp_from_email']?.value || '');
       setSmtpPassword(configs['smtp_password']?.value || '');
     }
   }, [systemConfigsQuery.data, configs]);
@@ -132,6 +134,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
         { key: 'smtp_host', value: smtpHost },
         { key: 'smtp_port', value: smtpPort },
         { key: 'smtp_username', value: smtpUsername },
+        { key: 'smtp_from_email', value: smtpFromEmail },
         { key: 'smtp_password', value: smtpPassword },
       ];
 
@@ -178,6 +181,7 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
         smtp_host: smtpHost,
         smtp_port: parseInt(smtpPort, 10) || 587,
         smtp_username: smtpUsername,
+        smtp_from_email: smtpFromEmail,
         smtp_password: smtpPassword,
         to: smtpTestTo,
       });
@@ -378,6 +382,23 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
                   value={smtpHost}
                   onChange={(e) => setSmtpHost(e.target.value)}
                   placeholder='例如: smtp.example.com'
+                  className='bg-card border-dashed text-xs'
+                />
+              </div>
+
+              <div className='space-y-1.5'>
+                <Label
+                  htmlFor='smtp_from_email'
+                  className='text-xs font-semibold'
+                >
+                  发件邮箱
+                </Label>
+                <Input
+                  id='smtp_from_email'
+                  type='email'
+                  value={smtpFromEmail}
+                  onChange={(e) => setSmtpFromEmail(e.target.value)}
+                  placeholder='例如: no-reply@example.com'
                   className='bg-card border-dashed text-xs'
                 />
               </div>

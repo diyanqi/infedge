@@ -51,6 +51,7 @@ const WAFIPGroupsConfigFileName = "waf_ip_groups.json"
 
 // WAFIPGroupsChecksumFileName is atomically published after the IP group JSON snapshot.
 const WAFIPGroupsChecksumFileName = WAFIPGroupsConfigFileName + ".checksum"
+const trafficQuotaFileName = "traffic_quota.json"
 const powConfigFileName = "pow_config.json"
 
 const (
@@ -472,6 +473,39 @@ func (m *Manager) Restart(ctx context.Context) error {
 	}
 	slog.Info("openresty restart requested")
 	return m.Executor.Restart(ctx)
+}
+
+// ApplyTrafficQuota atomically updates the runtime policy consumed by Lua.
+// It does not reload OpenResty; workers refresh the policy on their next request.
+func (m *Manager) ApplyTrafficQuota(_ context.Context, quota *protocol.TrafficQuota) error {
+	if m == nil || quota == nil {
+		return nil
+	}
+	dir := m.luaRuntimePath()
+	if dir == "" {
+		return errors.New("lua runtime directory 不能为空")
+	}
+	if err := os.MkdirAll(dir, nginxDirPerm); err != nil {
+		return err
+	}
+	data, err := json.Marshal(quota)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, trafficQuotaFileName+"-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, filepath.Join(dir, trafficQuotaFileName))
 }
 
 // CurrentChecksum returns a stable checksum for the active OpenResty configuration bundle.

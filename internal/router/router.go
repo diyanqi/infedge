@@ -129,7 +129,7 @@ func registerRoutes(r *gin.Engine) {
 	{
 		apiV1Router := apiGroup.Group("/v1")
 		{
-			v1.RegisterV1Routes(apiV1Router, apiGroup)
+			v1.RegisterV1Routes(apiV1Router, apiGroup, r)
 		}
 	}
 }

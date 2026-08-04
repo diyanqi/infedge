@@ -64,7 +64,7 @@ func RenderMainConfig(doc Document) string {
 	if strings.TrimSpace(templateText) == "" {
 		templateText = defaultMainConfigTemplate
 	}
-	return renderMainConfigTemplate(templateText, cfg, collectEffectiveLimitReqRates(doc.Routes, cfg))
+	return renderMainConfigTemplate(templateText, cfg, collectEffectiveLimitReqRates(doc.Routes, cfg), renderOwnerMap(doc.Routes))
 }
 
 // ValidateMainConfigTemplate checks that the provided template text is non-empty
@@ -159,12 +159,12 @@ func DedupeSupportFiles(files []SupportFile) []SupportFile {
 	return result
 }
 
-func renderMainConfigTemplate(templateText string, cfg ConfigSnapshot, limitReqRates []string) string {
+func renderMainConfigTemplate(templateText string, cfg ConfigSnapshot, limitReqRates []string, ownerMap string) string {
 	replacer := strings.NewReplacer(
 		"{{OpenRestyWorkerProcesses}}", cfg.WorkerProcesses,
 		"{{OpenRestyWorkerConnections}}", fmt.Sprintf("%d", cfg.WorkerConnections),
 		"{{OpenRestyWorkerRlimitNofile}}", fmt.Sprintf("%d", cfg.WorkerRlimitNofile),
-		"{{OpenRestyConnectionUpgradeMap}}", renderConnectionUpgradeMap(),
+		"{{OpenRestyConnectionUpgradeMap}}", renderConnectionUpgradeMap()+ownerMap,
 		"{{OpenRestyDefaultServerBlock}}", renderDefaultServerBlock(cfg.DefaultServerReturnStatus, cfg.HTTP3Enabled),
 		"{{OpenRestyAccessLogPath}}", AccessLogPlaceholder,
 		"{{OpenRestyErrorLogPath}}", ErrorLogPlaceholder,
@@ -193,6 +193,32 @@ func renderMainConfigTemplate(templateText string, cfg ConfigSnapshot, limitReqR
 		"{{OpenRestyRouteConfigInclude}}", RouteConfigPlaceholder,
 	)
 	return replacer.Replace(templateText)
+}
+
+func renderOwnerMap(routes []Route) string {
+	owners := make(map[string]uint64)
+	for _, route := range routes {
+		for _, domain := range normalizedRouteDomains(route) {
+			if strings.TrimSpace(domain) != "" {
+				owners[strings.ToLower(strings.TrimSpace(domain))] = route.OwnerID
+			}
+		}
+	}
+	if len(owners) == 0 {
+		return "    map $host $openflare_owner_id { default 0; }\n"
+	}
+	domains := make([]string, 0, len(owners))
+	for domain := range owners {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+	var builder strings.Builder
+	builder.WriteString("    map $host $openflare_owner_id {\n        default 0;\n")
+	for _, domain := range domains {
+		fmt.Fprintf(&builder, "        %s %d;\n", quoteNginxStringLiteral(domain), owners[domain])
+	}
+	builder.WriteString("    }\n")
+	return builder.String()
 }
 
 func renderTemplateDirective(enabled bool, statement string) string {
@@ -266,7 +292,7 @@ func limitReqZoneName(rate string) string {
 }
 
 func renderOpenRestyObservabilityTemplateBlock() string {
-	return fmt.Sprintf("    lua_shared_dict openflare_observability 10m;\n    lua_shared_dict openflare_pow_challenges 10m;\n    lua_shared_dict openflare_pow_sessions 10m;\n    lua_shared_dict openflare_pow_config 1m;\n    lua_shared_dict openflare_waf_config 1m;\n    lua_shared_dict openflare_waf_ip_groups 64m;\n    init_worker_by_lua_file %s/observability/init.lua;\n    log_by_lua_file %s/observability/log.lua;\n\n    server {\n        listen %s;\n        server_name openflare-observability;\n        access_log off;\n\n        location = /openflare/stub_status {\n            stub_status;\n        }\n\n        location = /openflare/observability {\n            default_type application/json;\n            content_by_lua_file %s/observability/read.lua;\n        }\n    }\n\n", LuaDirPlaceholder, LuaDirPlaceholder, ObservabilityListenPlaceholder, LuaDirPlaceholder)
+	return fmt.Sprintf("    lua_shared_dict openflare_observability 10m;\n    lua_shared_dict openflare_traffic_quota 1m;\n    lua_shared_dict openflare_pow_challenges 10m;\n    lua_shared_dict openflare_pow_sessions 10m;\n    lua_shared_dict openflare_pow_config 1m;\n    lua_shared_dict openflare_waf_config 1m;\n    lua_shared_dict openflare_waf_ip_groups 64m;\n    init_worker_by_lua_file %s/observability/init.lua;\n    log_by_lua_file %s/observability/log.lua;\n\n    server {\n        listen %s;\n        server_name openflare-observability;\n        access_log off;\n\n        location = /openflare/stub_status {\n            stub_status;\n        }\n\n        location = /openflare/observability {\n            default_type application/json;\n            content_by_lua_file %s/observability/read.lua;\n        }\n    }\n\n", LuaDirPlaceholder, LuaDirPlaceholder, ObservabilityListenPlaceholder, LuaDirPlaceholder)
 }
 
 func renderHTTPProxyServer(serverNames string, siteName string, originURL string, originHost string, customHeaders []CustomHeader, cacheConfig routeCacheConfig, limitConfig routeLimitConfig, upstreamConfig routeUpstreamConfig, powEnabled bool, basicAuthEnabled bool, basicAuthUsername string, basicAuthPassword string, cfg ConfigSnapshot) string {
@@ -445,7 +471,7 @@ func renderProxyHeaderBlock(originURL string, originHost string, customHeaders [
 func renderAccessBlock(siteName string, powEnabled bool) string {
 	escapedSiteName := escapeNginxString(siteName)
 	if !powEnabled {
-		return fmt.Sprintf("    set $openflare_waf_site \"%s\";\n    access_by_lua_file %s/waf/check.lua;\n", escapedSiteName, LuaDirPlaceholder)
+		return fmt.Sprintf("    set $openflare_waf_site \"%s\";\n    access_by_lua_file %s/waf/check.lua;\n    access_by_lua_block { require(\"traffic.quota\").apply() }\n", escapedSiteName, LuaDirPlaceholder)
 	}
 	return fmt.Sprintf(`    set $openflare_waf_site "%s";
     access_by_lua_block {
@@ -457,6 +483,7 @@ func renderAccessBlock(siteName string, powEnabled bool) string {
             return
         end
         require("pow.runtime").check()
+        require("traffic.quota").apply()
     }
 `, escapedSiteName, LuaDirPlaceholder, LuaDirPlaceholder, LuaDirPlaceholder)
 }

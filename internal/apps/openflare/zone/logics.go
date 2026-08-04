@@ -65,6 +65,10 @@ func normalizeDomain(raw string) (string, error) {
 
 // Create persists a validated registered root.
 func Create(ctx context.Context, input Input) (*model.Zone, error) {
+	return create(ctx, 0, input)
+}
+
+func create(ctx context.Context, ownerID uint64, input Input) (*model.Zone, error) {
 	domain, err := normalizeDomain(input.Domain)
 	if err != nil {
 		return nil, err
@@ -73,7 +77,7 @@ func Create(ctx context.Context, input Input) (*model.Zone, error) {
 	if err != nil || root != domain {
 		return nil, errors.New(errZoneRootInvalid)
 	}
-	zone := &model.Zone{Domain: domain}
+	zone := &model.Zone{Domain: domain, OwnerID: ownerID}
 	if err := repository.CreateZone(ctx, zone); err != nil {
 		if isUnique(err) {
 			return nil, errors.New(errDomainExists)
@@ -134,6 +138,68 @@ func List(ctx context.Context) ([]ListItem, error) {
 		})
 	}
 	return items, nil
+}
+
+// ListOwned returns zones visible to one ordinary user.
+func ListOwned(ctx context.Context, userID uint64) ([]ListItem, error) {
+	zones, err := repository.ListOwnedZones(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	counts, err := repository.ListZoneDomainCounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	countMap := make(map[uint]int64, len(counts))
+	for _, row := range counts {
+		countMap[row.ZoneID] = row.Count
+	}
+	items := make([]ListItem, 0, len(zones))
+	for _, row := range zones {
+		items = append(items, ListItem{ID: row.ID, Domain: row.Domain, DomainCount: countMap[row.ID], CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
+	}
+	return items, nil
+}
+
+// GetOwnedOverview returns a zone only when owned by the user.
+func GetOwnedOverview(ctx context.Context, id uint, userID uint64) (*Overview, error) {
+	if _, err := repository.GetOwnedZoneByID(ctx, id, userID); err != nil {
+		return nil, err
+	}
+	return GetOverview(ctx, id)
+}
+
+// CreateOwned creates a zone and assigns its owner.
+func CreateOwned(ctx context.Context, userID uint64, input Input) (*model.Zone, error) {
+	return create(ctx, userID, input)
+}
+
+// UpdateOwned updates an owned zone.
+func UpdateOwned(ctx context.Context, id uint, userID uint64, input Input) (*model.Zone, error) {
+	if _, err := repository.GetOwnedZoneByID(ctx, id, userID); err != nil {
+		return nil, err
+	}
+	zone, err := Update(ctx, id, input)
+	if zone != nil {
+		zone.OwnerID = userID
+	}
+	return zone, err
+}
+
+// DeleteOwned deletes an owned zone.
+func DeleteOwned(ctx context.Context, id uint, userID uint64) error {
+	if _, err := repository.GetOwnedZoneByID(ctx, id, userID); err != nil {
+		return err
+	}
+	return Delete(ctx, id)
+}
+
+// CreateOwnedDomain creates a domain under an owned zone.
+func CreateOwnedDomain(ctx context.Context, zoneID uint, userID uint64, input DomainInput) (*model.ZoneDomain, error) {
+	if _, err := repository.GetOwnedZoneByID(ctx, zoneID, userID); err != nil {
+		return nil, err
+	}
+	return CreateDomain(ctx, zoneID, input)
 }
 
 // GetOverview returns a Zone and its domains.

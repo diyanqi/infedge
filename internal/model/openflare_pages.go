@@ -16,6 +16,7 @@ const (
 // PagesProject OpenFlare Pages 静态托管项目。
 type PagesProject struct {
 	ID                   uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID              uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Name                 string    `json:"name" gorm:"size:255;not null"`
 	Slug                 string    `json:"slug" gorm:"uniqueIndex;size:128;not null"`
 	Description          string    `json:"description" gorm:"type:text;not null;default:''"`

@@ -26,6 +26,7 @@ import { DbManageService } from './db-manage';
 import { PushService } from './push';
 import { AdminUploadService, UploadService } from './upload';
 import { UserService } from './user';
+import { CustomService } from './custom';
 import {
   AccessLogService,
   ApplyLogService,
@@ -77,6 +78,7 @@ const services = {
   openflareOption: OptionService,
   openflareUptimeKuma: UptimeKumaService,
   openflareStatus: StatusService,
+  custom: CustomService,
 } as const;
 
 export default services;

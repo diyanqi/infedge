@@ -58,6 +58,41 @@ func ListOrigins(ctx context.Context) ([]View, error) {
 	return buildOriginViews(ctx, origins)
 }
 
+// ListOwnedOrigins lists origins visible to one ordinary user.
+func ListOwnedOrigins(ctx context.Context, userID uint64) ([]model.Origin, error) {
+	return repository.ListOwnedOrigins(ctx, userID)
+}
+
+// GetOwnedOrigin returns an origin only when owned by the user.
+func GetOwnedOrigin(ctx context.Context, id uint, userID uint64) (*model.Origin, error) {
+	return repository.GetOwnedOriginByID(ctx, id, userID)
+}
+
+// CreateOwnedOrigin creates an origin and assigns its owner.
+func CreateOwnedOrigin(ctx context.Context, userID uint64, input Input) (*model.Origin, error) {
+	return createOrigin(ctx, userID, input)
+}
+
+// UpdateOwnedOrigin updates only an owned origin.
+func UpdateOwnedOrigin(ctx context.Context, id uint, userID uint64, input Input) (*model.Origin, error) {
+	if _, err := repository.GetOwnedOriginByID(ctx, id, userID); err != nil {
+		return nil, err
+	}
+	origin, err := UpdateOrigin(ctx, id, input)
+	if origin != nil {
+		origin.OwnerID = userID
+	}
+	return origin, err
+}
+
+// DeleteOwnedOrigin deletes only an owned origin.
+func DeleteOwnedOrigin(ctx context.Context, id uint, userID uint64) error {
+	if _, err := repository.GetOwnedOriginByID(ctx, id, userID); err != nil {
+		return err
+	}
+	return DeleteOrigin(ctx, id)
+}
+
 // GetOriginDetail 获取源站详情。
 func GetOriginDetail(ctx context.Context, id uint) (*DetailView, error) {
 	origin, err := repository.GetOriginByID(ctx, id)
@@ -101,7 +136,11 @@ func GetOriginDetail(ctx context.Context, id uint) (*DetailView, error) {
 
 // CreateOrigin 创建源站。
 func CreateOrigin(ctx context.Context, input Input) (*model.Origin, error) {
-	origin, err := buildOrigin(nil, input)
+	return createOrigin(ctx, 0, input)
+}
+
+func createOrigin(ctx context.Context, ownerID uint64, input Input) (*model.Origin, error) {
+	origin, err := buildOrigin(&model.Origin{OwnerID: ownerID}, input)
 	if err != nil {
 		return nil, err
 	}

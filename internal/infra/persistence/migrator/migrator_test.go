@@ -20,8 +20,9 @@ import (
 
 // expectedMigratedSystemConfigCount 包含初始 32 项系统配置、202606220004
 // 从 of_options 迁移过来的 48 项业务配置、Pages 的 2 项业务配置、
-// OpenResty 默认限流的 3 项业务配置，以及单 IP 请求频率限制 1 项业务配置。
-const expectedMigratedSystemConfigCount = 86
+// OpenResty 默认限流的 3 项业务配置、单 IP 请求频率限制 1 项业务配置，
+// 以及 SMTP 发件邮箱 1 项业务配置。
+const expectedMigratedSystemConfigCount = 87
 
 func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 	sqliteDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
@@ -52,7 +53,15 @@ func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 		mr.Close()
 	})
 
-	Migrate()
+	firstReport := Migrate()
+	if !firstReport.Applied {
+		t.Fatal("first Migrate() call should apply migrations to a fresh database")
+	}
+
+	secondReport := Migrate()
+	if secondReport.Applied {
+		t.Fatal("second Migrate() call should skip already applied migrations")
+	}
 
 	var systemConfigCount int64
 	if err := sqliteDB.Table("w_system_configs").Count(&systemConfigCount).Error; err != nil {

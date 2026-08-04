@@ -35,6 +35,7 @@ func (OpenFlareMetricSnapshot) TableName() string {
 type OpenFlareAccessLog struct {
 	ID            uint64    `json:"id,string" gorm:"column:id"`
 	NodeID        string    `json:"node_id" gorm:"index;size:64;not null"`
+	OwnerID       uint64    `json:"owner_id" gorm:"index"`
 	LoggedAt      time.Time `json:"logged_at" gorm:"index"`
 	RemoteAddr    string    `json:"remote_addr" gorm:"index;size:128"`
 	Region        string    `json:"region" gorm:"size:128"`

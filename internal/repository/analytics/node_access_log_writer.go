@@ -41,6 +41,7 @@ func BatchInsertNodeAccessLogs(ctx context.Context, logs []analyticsmodel.NodeAc
 		if err := batch.Append(
 			id,
 			logItem.NodeID,
+			logItem.OwnerID,
 			logItem.LoggedAt.UTC(),
 			strings.TrimSpace(logItem.RemoteAddr),
 			logItem.Region,
