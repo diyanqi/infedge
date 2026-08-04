@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	db "github.com/Rain-kl/Wavelet/internal/infra/persistence"
@@ -21,6 +22,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+const oauthEmailParts = 2
 
 // Callback OAuth 回调处理
 // @Summary OAuth 回调处理
@@ -202,6 +205,10 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 		c.JSON(http.StatusOK, response.OK(buildCallbackResult(nil, "need_bind")))
 		return model.User{}, false
 	}
+	if !oauthRegistrationEmailAllowed(ctx, userInfo.Email) {
+		response.AbortBadRequest(c, "该邮箱域名不在允许注册的白名单中")
+		return model.User{}, false
+	}
 
 	username, uniqueErr := uniqueUsername(ctx, userInfo.Username)
 	if uniqueErr != nil {
@@ -228,4 +235,22 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 	logger.InfoF(ctx, "[LoginAudit] successful OAuth registration via source: %s, external ID: %s, user: %s, ID: %d, IP: %s", source.Name, userInfo.Sub, user.Username, user.ID, c.ClientIP())
 
 	return user, true
+}
+
+func oauthRegistrationEmailAllowed(ctx context.Context, email string) bool {
+	config, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyRegistrationEmailDomainAllowlist)
+	if err != nil || strings.TrimSpace(config.Value) == "" || strings.TrimSpace(email) == "" {
+		return true
+	}
+	parts := strings.SplitN(model.NormalizeEmail(email), "@", oauthEmailParts)
+	if len(parts) != oauthEmailParts {
+		return false
+	}
+	for _, item := range strings.Split(config.Value, ",") {
+		allowed := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(item)), "@")
+		if allowed != "" && (parts[1] == allowed || strings.HasSuffix(parts[1], "."+allowed)) {
+			return true
+		}
+	}
+	return false
 }

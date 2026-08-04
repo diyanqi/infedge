@@ -4,10 +4,14 @@ import type {
   PaymentChannel,
   PaymentOrder,
   PlanInput,
+  ResourceCertificate,
   RedeemCode,
   ResourceDomain,
   ResourceOrigin,
   ResourceRoute,
+  ResourceRouteWaf,
+  ResourceWafRule,
+  ResourcePolicy,
   ResourceZone,
   SubscriptionPlan,
   UserSubscription,
@@ -47,17 +51,67 @@ export class CustomService extends BaseService {
   ): Promise<{ zone: ResourceZone; domains: ResourceDomain[] }> {
     return this.get(`/resources/zones/${id}`);
   }
-  static createZone(domain: string): Promise<ResourceZone> {
-    return this.post('/resources/zones', { domain });
+  static createZone(
+    domain: string,
+    claims_ownership = false,
+  ): Promise<ResourceZone> {
+    return this.post('/resources/zones', { domain, claims_ownership });
   }
   static deleteZone(id: number): Promise<void> {
     return this.post(`/resources/zones/${id}/delete`);
   }
-  static createDomain(zoneId: number, domain: string): Promise<ResourceDomain> {
+  static createDomain(
+    zoneId: number,
+    domain: string,
+    certId: number | null = null,
+  ): Promise<ResourceDomain> {
     return this.post(`/resources/zones/${zoneId}/domains`, {
       domain,
-      cert_id: null,
+      cert_id: certId,
     });
+  }
+  static updateDomain(
+    zoneId: number,
+    domainId: number,
+    payload: { domain: string; cert_id: number | null },
+  ): Promise<ResourceDomain> {
+    return this.post(
+      `/resources/zones/${zoneId}/domains/${domainId}/update`,
+      payload,
+    );
+  }
+  static verifyZone(id: number): Promise<ResourceZone> {
+    return this.post(`/resources/zones/${id}/verify`);
+  }
+  static verifyDomain(
+    zoneId: number,
+    domainId: number,
+  ): Promise<ResourceDomain> {
+    return this.post(`/resources/zones/${zoneId}/domains/${domainId}/verify`);
+  }
+  static listCertificates(): Promise<ResourceCertificate[]> {
+    return this.get('/resources/tls-certificates');
+  }
+  static listPolicies(): Promise<ResourcePolicy> {
+    return this.get('/resources/policies');
+  }
+  static listWafRules(): Promise<ResourceWafRule[]> {
+    return this.get('/resources/waf/rule-groups');
+  }
+  static createWafRule(payload: {
+    name: string;
+    host: string;
+  }): Promise<ResourceWafRule> {
+    return this.post('/resources/waf/rule-groups', payload);
+  }
+  static getRouteWaf(routeId: number): Promise<ResourceRouteWaf> {
+    return this.get(`/resources/waf/routes/${routeId}/rule-groups`);
+  }
+  static updateRouteWaf(
+    routeId: number,
+    ids: number[],
+  ): Promise<ResourceRouteWaf> {
+    return this.post(`/resources/waf/routes/${routeId}/rule-groups`, { ids });
   }
   static listOrigins(): Promise<ResourceOrigin[]> {
     return this.get('/resources/origins');
@@ -80,6 +134,12 @@ export class CustomService extends BaseService {
   }
   static deleteRoute(id: number): Promise<void> {
     return this.post(`/resources/proxy-routes/${id}/delete`);
+  }
+  static updateRoute(
+    id: number,
+    payload: Record<string, unknown>,
+  ): Promise<ResourceRoute> {
+    return this.post(`/resources/proxy-routes/${id}/update`, payload);
   }
   static publish(): Promise<{ version: string; checksum: string }> {
     return this.post('/resources/publish');

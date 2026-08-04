@@ -12,6 +12,7 @@ const (
 	ConfigKeyPasswordLoginEnabled             = "password_login_enabled"              // 是否允许密码登录
 	ConfigKeyRegistrationEnabled              = "registration_enabled"                // 是否允许注册
 	ConfigKeyPasswordRegisterEnabled          = "password_register_enabled"           // 是否允许密码注册
+	ConfigKeyRegistrationEmailDomainAllowlist = "registration_email_domain_allowlist" // 注册邮箱域名白名单，逗号分隔
 	ConfigKeyOIDCLoginEnabled                 = "oidc_login_enabled"                  // 是否允许 OIDC 登录
 	ConfigKeyMaxAPIKeysPerUser                = "max_api_keys_per_user"               //nolint:gosec // false positive: config key name. 每个用户最大 API Key 数量
 	ConfigKeyCapLoginEnabled                  = "cap_login_enabled"                   // 是否启用登录人机验证

@@ -95,6 +95,7 @@ export const openflareSidebarNav: OpenFlareSidebarNavEntry[] = [
 
 export const ordinaryUserNav: OpenFlareNavItem[] = [
   { title: '我的资源', url: '/resources', icon: Globe },
+  { title: 'Pages', url: '/pages', icon: FileText, childUrls: ['/pages/detail'] },
   { title: '套餐订阅', url: '/plans', icon: Package },
 ];
 

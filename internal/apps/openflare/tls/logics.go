@@ -115,10 +115,20 @@ func GetCertificateContent(ctx context.Context, id uint) (*CertificateContent, e
 
 // CreateCertificate 从 PEM 创建证书。
 func CreateCertificate(ctx context.Context, input CertificateInput) (*model.TLSCertificate, error) {
+	return createCertificate(ctx, 0, input)
+}
+
+// CreateCertificateOwned creates a user-owned uploaded certificate.
+func CreateCertificateOwned(ctx context.Context, ownerID uint64, input CertificateInput) (*model.TLSCertificate, error) {
+	return createCertificate(ctx, ownerID, input)
+}
+
+func createCertificate(ctx context.Context, ownerID uint64, input CertificateInput) (*model.TLSCertificate, error) {
 	certificate, err := buildCertificate(ctx, nil, input)
 	if err != nil {
 		return nil, err
 	}
+	certificate.OwnerID = ownerID
 	if err = repository.CreateTLSCertificateRecord(ctx, certificate); err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, errors.New(errCertificateNameExists)
@@ -126,6 +136,11 @@ func CreateCertificate(ctx context.Context, input CertificateInput) (*model.TLSC
 		return nil, err
 	}
 	return sanitizeCertificateForResponse(certificate), nil
+}
+
+// ListCertificatesOwned lists only certificates owned by the caller.
+func ListCertificatesOwned(ctx context.Context, ownerID uint64) ([]model.TLSCertificate, error) {
+	return repository.ListOwnedTLSCertificates(ctx, ownerID)
 }
 
 // CreateCertificateFromFiles 从上传文件创建证书。

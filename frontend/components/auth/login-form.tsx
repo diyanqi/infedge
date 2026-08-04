@@ -205,9 +205,10 @@ export function LoginForm({
     setCapError(true);
   };
 
-  const registrationEnabled =
-    configBool(publicConfigQuery.data?.registration_enabled, false) &&
-    configBool(publicConfigQuery.data?.password_register_enabled, false);
+  const registrationEnabled = configBool(
+    publicConfigQuery.data?.registration_enabled,
+    false,
+  );
 
   const passwordLoginEnabled = configBool(
     publicConfigQuery.data?.password_login_enabled,

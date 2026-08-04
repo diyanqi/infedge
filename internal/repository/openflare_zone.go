@@ -83,6 +83,17 @@ func GetZoneDomainByZoneAndID(ctx context.Context, zoneID, id uint) (*model.Zone
 	return &item, nil
 }
 
+// GetOwnedZoneDomainByID loads a domain through its owning Zone.
+func GetOwnedZoneDomainByID(ctx context.Context, zoneID, id uint, ownerID uint64) (*model.ZoneDomain, error) {
+	var domain model.ZoneDomain
+	if err := db.DB(ctx).Where("id = ? AND zone_id = ?", id, zoneID).
+		Where("EXISTS (SELECT 1 FROM of_zones z WHERE z.id = of_zone_domains.zone_id AND z.owner_id = ?)", ownerID).
+		First(&domain).Error; err != nil {
+		return nil, err
+	}
+	return &domain, nil
+}
+
 // CreateZoneDomain creates a zone domain record.
 func CreateZoneDomain(ctx context.Context, domain *model.ZoneDomain) error {
 	return db.DB(ctx).Create(domain).Error

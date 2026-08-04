@@ -228,6 +228,7 @@ type WAFRuleNode struct {
 type WAFRuleGroup struct {
 	ID                uint         `json:"id"`
 	Name              string       `json:"name"`
+	Host              string       `json:"host,omitempty"`
 	Enabled           bool         `json:"enabled"`
 	IsGlobal          bool         `json:"is_global"`
 	BlockStatusCode   int          `json:"block_status_code"`

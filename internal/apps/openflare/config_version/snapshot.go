@@ -74,6 +74,7 @@ type snapshotRoute struct {
 type snapshotWAFRuleGroup struct {
 	ID       uint                 `json:"id"`
 	Name     string               `json:"name"`
+	Host     string               `json:"host,omitempty"`
 	Enabled  bool                 `json:"enabled"`
 	IsGlobal bool                 `json:"is_global"`
 	Graph    waf.RuntimeRuleGraph `json:"graph"`
@@ -335,7 +336,7 @@ func buildSnapshotWAFDocument(ctx context.Context, routes []*model.ProxyRoute) (
 			return snapshotWAFDocument{}, fmt.Errorf("WAF 规则 %s 编译失败: %w", group.Name, compileErr)
 		}
 		ruleGroups = append(ruleGroups, snapshotWAFRuleGroup{
-			ID: group.ID, Name: group.Name, Enabled: group.Enabled, IsGlobal: group.IsGlobal, Graph: runtimeGraph,
+			ID: group.ID, Name: group.Name, Host: group.Host, Enabled: group.Enabled, IsGlobal: group.IsGlobal, Graph: runtimeGraph,
 		})
 		enabledRuleIDs[group.ID] = struct{}{}
 		for _, id := range waf.ReferencedIPGroupIDs(editorGraph) {

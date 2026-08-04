@@ -20,6 +20,7 @@ import (
 // CreateRuleInput is the minimal payload used to create an orchestrated rule.
 type CreateRuleInput struct {
 	Name string `json:"name"`
+	Host string `json:"host"`
 }
 
 // SaveRuleGraphInput atomically replaces a rule graph at the supplied revision.
@@ -31,6 +32,7 @@ type SaveRuleGraphInput struct {
 // UpdateRuleMetaInput updates metadata without replacing the graph.
 type UpdateRuleMetaInput struct {
 	Name    string `json:"name"`
+	Host    string `json:"host"`
 	Enabled bool   `json:"enabled"`
 }
 
@@ -43,7 +45,9 @@ func (err *RuleValidationError) Unwrap() error { return err.Err }
 // RuleView is the API representation of an orchestrated WAF rule.
 type RuleView struct {
 	ID               uint      `json:"id"`
+	OwnerID          uint64    `json:"owner_id"`
 	Name             string    `json:"name"`
+	Host             string    `json:"host"`
 	Enabled          bool      `json:"enabled"`
 	IsGlobal         bool      `json:"is_global"`
 	Graph            RuleGraph `json:"graph"`
@@ -78,6 +82,47 @@ func ListRules(ctx context.Context) ([]RuleView, error) {
 	return views, nil
 }
 
+// ListRulesForOwner returns global read-only rules and the caller's rules.
+func ListRulesForOwner(ctx context.Context, ownerID uint64) ([]RuleView, error) {
+	if err := EnsureDefaultRuleGroup(ctx); err != nil {
+		return nil, err
+	}
+	groups, err := repository.ListOpenFlareWAFRuleGroupsForOwner(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadRuleGroupBindings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	routes, err := repository.ListOwnedProxyRoutes(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	ownedRoutes := make(map[uint]struct{}, len(routes))
+	for _, route := range routes {
+		ownedRoutes[route.ID] = struct{}{}
+	}
+	for groupID, routeIDs := range bindings {
+		filtered := routeIDs[:0]
+		for _, routeID := range routeIDs {
+			if _, ok := ownedRoutes[routeID]; ok {
+				filtered = append(filtered, routeID)
+			}
+		}
+		bindings[groupID] = filtered
+	}
+	views := make([]RuleView, 0, len(groups))
+	for _, group := range groups {
+		view, buildErr := buildRuleView(group, bindings[group.ID])
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		views = append(views, view)
+	}
+	return views, nil
+}
+
 // GetRule returns one orchestrated WAF rule.
 func GetRule(ctx context.Context, id uint) (*RuleView, error) {
 	group, err := repository.GetOpenFlareWAFRuleGroupByID(ctx, id)
@@ -92,8 +137,31 @@ func GetRule(ctx context.Context, id uint) (*RuleView, error) {
 	return &view, err
 }
 
+// GetRuleForOwner returns a global or owner-private rule.
+func GetRuleForOwner(ctx context.Context, id uint, ownerID uint64) (*RuleView, error) {
+	group, err := repository.GetOpenFlareWAFRuleGroupForOwner(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadRuleGroupBindings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	view, err := buildRuleView(group, bindings[group.ID])
+	return &view, err
+}
+
 // CreateRule creates a disabled custom rule with the safe default graph.
 func CreateRule(ctx context.Context, input CreateRuleInput) (*RuleView, error) {
+	return createRule(ctx, 0, input)
+}
+
+// CreateRuleForOwner creates a private rule group for one user.
+func CreateRuleForOwner(ctx context.Context, ownerID uint64, input CreateRuleInput) (*RuleView, error) {
+	return createRule(ctx, ownerID, input)
+}
+
+func createRule(ctx context.Context, ownerID uint64, input CreateRuleInput) (*RuleView, error) {
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return nil, &RuleValidationError{Err: errors.New("WAF 规则名称不能为空")}
@@ -102,7 +170,7 @@ func CreateRule(ctx context.Context, input CreateRuleInput) (*RuleView, error) {
 	if err != nil {
 		return nil, err
 	}
-	group := &model.OpenFlareWAFRuleGroup{Name: name, Enabled: false, IsGlobal: false, Graph: string(raw), Revision: 1}
+	group := &model.OpenFlareWAFRuleGroup{Name: name, Host: strings.ToLower(strings.TrimSpace(input.Host)), OwnerID: ownerID, Enabled: false, IsGlobal: false, Graph: string(raw), Revision: 1}
 	if err = repository.CreateOpenFlareWAFRuleGroup(ctx, group); err != nil {
 		return nil, err
 	}
@@ -125,11 +193,31 @@ func UpdateRuleMeta(ctx context.Context, id uint, input UpdateRuleMetaInput) (*R
 	if name == "" {
 		return nil, &RuleValidationError{Err: errors.New("WAF 规则名称不能为空")}
 	}
-	group.Name, group.Enabled = name, input.Enabled
+	group.Name, group.Host, group.Enabled = name, strings.ToLower(strings.TrimSpace(input.Host)), input.Enabled
 	if err = repository.UpdateOpenFlareWAFRuleGroup(ctx, group); err != nil {
 		return nil, err
 	}
 	return GetRule(ctx, id)
+}
+
+// UpdateRuleMetaForOwner updates only a user's private rule.
+func UpdateRuleMetaForOwner(ctx context.Context, id uint, ownerID uint64, input UpdateRuleMetaInput) (*RuleView, error) {
+	group, err := repository.GetOpenFlareWAFRuleGroupForOwner(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if group.IsGlobal {
+		return nil, errors.New("全局 WAF 规则只读")
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, &RuleValidationError{Err: errors.New("WAF 规则名称不能为空")}
+	}
+	group.Name, group.Host, group.Enabled = name, strings.ToLower(strings.TrimSpace(input.Host)), input.Enabled
+	if err = repository.UpdateOpenFlareWAFRuleGroupForOwner(ctx, group, ownerID); err != nil {
+		return nil, err
+	}
+	return GetRuleForOwner(ctx, id, ownerID)
 }
 
 // DeleteRuleGroup deletes a non-global orchestrated WAF rule.
@@ -162,6 +250,28 @@ func SaveRuleGraph(ctx context.Context, id uint, input SaveRuleGraphInput) (*Rul
 	return GetRule(ctx, id)
 }
 
+// SaveRuleGraphForOwner updates only a user's private rule graph.
+func SaveRuleGraphForOwner(ctx context.Context, id uint, ownerID uint64, input SaveRuleGraphInput) (*RuleView, error) {
+	group, err := repository.GetOpenFlareWAFRuleGroupForOwner(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if group.IsGlobal {
+		return nil, errors.New("全局 WAF 规则只读")
+	}
+	if err := ValidateRuleGraph(ctx, input.Graph, ruleIPGroupExists); err != nil {
+		return nil, &RuleValidationError{Err: fmt.Errorf("规则图无效: %w", err)}
+	}
+	raw, err := json.Marshal(input.Graph)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = repository.UpdateOpenFlareWAFRuleGraph(ctx, id, input.Revision, string(raw)); err != nil {
+		return nil, err
+	}
+	return GetRuleForOwner(ctx, id, ownerID)
+}
+
 func ruleIPGroupExists(ctx context.Context, id uint) (bool, error) {
 	_, err := repository.GetOpenFlareWAFIPGroupByID(ctx, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -181,7 +291,7 @@ func buildRuleView(group *model.OpenFlareWAFRuleGroup, appliedSiteIDs []uint) (R
 		}
 	}
 	ids := append([]uint(nil), appliedSiteIDs...)
-	return RuleView{ID: group.ID, Name: group.Name, Enabled: group.Enabled, IsGlobal: group.IsGlobal,
+	return RuleView{ID: group.ID, OwnerID: group.OwnerID, Name: group.Name, Host: group.Host, Enabled: group.Enabled, IsGlobal: group.IsGlobal,
 		Graph: graph, Revision: group.Revision, AppliedSiteIDs: ids, AppliedSiteCount: len(ids),
 		CreatedAt: group.CreatedAt.Format(time.RFC3339), UpdatedAt: group.UpdatedAt.Format(time.RFC3339)}, nil
 }

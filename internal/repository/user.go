@@ -155,7 +155,10 @@ func CountUsersByUsername(ctx context.Context, username string) (int64, error) {
 // CountUsersByEmail returns how many users share the email.
 func CountUsersByEmail(ctx context.Context, email string) (int64, error) {
 	var count int64
-	if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", email).Count(&count).Error; err != nil {
+	normalized := model.NormalizeEmail(email)
+	if err := db.DB(ctx).Model(&model.User{}).
+		Where("email_normalized = ? OR (email_normalized = '' AND email = ?)", normalized, email).
+		Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -163,6 +166,9 @@ func CountUsersByEmail(ctx context.Context, email string) (int64, error) {
 
 // CreateUser persists a new user record.
 func CreateUser(ctx context.Context, user *model.User) error {
+	if user.Email != "" {
+		user.EmailNormalized = model.NormalizeEmail(user.Email)
+	}
 	return db.DB(ctx).Create(user).Error
 }
 
@@ -202,14 +208,15 @@ func CreateUserFromOAuth(ctx context.Context, userOut *model.User, oauthInfo *mo
 	now := time.Now()
 	userID := oauthInfo.GetID()
 	newUser := model.User{
-		ID:          userID,
-		Username:    oauthInfo.Username,
-		Nickname:    oauthInfo.Name,
-		Email:       oauthInfo.Email,
-		AvatarURL:   oauthInfo.AvatarURL,
-		IsActive:    oauthInfo.Active,
-		LastLoginAt: now,
-		IsAdmin:     false,
+		ID:              userID,
+		Username:        oauthInfo.Username,
+		Nickname:        oauthInfo.Name,
+		Email:           oauthInfo.Email,
+		EmailNormalized: model.NormalizeEmail(oauthInfo.Email),
+		AvatarURL:       oauthInfo.AvatarURL,
+		IsActive:        oauthInfo.Active,
+		LastLoginAt:     now,
+		IsAdmin:         false,
 	}
 	if newUser.ID == 0 {
 		newUser.ID = idgen.NextUint64ID()
@@ -244,7 +251,10 @@ func GetActiveUserByID(ctx context.Context, id uint64) (model.User, error) {
 // GetUserByUsernameOrEmail loads a user by username or email.
 func GetUserByUsernameOrEmail(ctx context.Context, input string) (model.User, error) {
 	var user model.User
-	if err := db.DB(ctx).Where("username = ? OR email = ?", input, input).First(&user).Error; err != nil {
+	normalized := model.NormalizeEmail(input)
+	if err := db.DB(ctx).
+		Where("username = ? OR email_normalized = ? OR (email_normalized = '' AND email = ?)", input, normalized, input).
+		First(&user).Error; err != nil {
 		return model.User{}, err
 	}
 	return user, nil
@@ -253,7 +263,10 @@ func GetUserByUsernameOrEmail(ctx context.Context, input string) (model.User, er
 // CountUsersByEmailExceptID counts users with the email excluding a given user id.
 func CountUsersByEmailExceptID(ctx context.Context, email string, exceptID uint64) (int64, error) {
 	var count int64
-	if err := db.DB(ctx).Model(&model.User{}).Where("email = ? AND id != ?", email, exceptID).Count(&count).Error; err != nil {
+	normalized := model.NormalizeEmail(email)
+	if err := db.DB(ctx).Model(&model.User{}).
+		Where("(email_normalized = ? OR (email_normalized = '' AND email = ?)) AND id != ?", normalized, email, exceptID).
+		Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -279,8 +292,11 @@ func RegisterUserWithChecks(ctx context.Context, user *model.User) error {
 		return errors.New("用户名已存在")
 	}
 	if user.Email != "" {
+		user.EmailNormalized = model.NormalizeEmail(user.Email)
 		var emailCount int64
-		if err := db.DB(ctx).Model(&model.User{}).Where("email = ?", user.Email).Count(&emailCount).Error; err != nil {
+		if err := db.DB(ctx).Model(&model.User{}).
+			Where("email_normalized = ? OR (email_normalized = '' AND email = ?)", user.EmailNormalized, user.Email).
+			Count(&emailCount).Error; err != nil {
 			return err
 		}
 		if emailCount > 0 {

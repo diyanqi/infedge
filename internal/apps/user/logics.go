@@ -49,16 +49,10 @@ type updateProfileInput struct {
 	Location  string
 }
 
+const userEmailParts = 2
+
 func isPasswordLoginEnabled(ctx context.Context) bool {
 	enabled, err := repository.GetBoolByKey(ctx, model.ConfigKeyPasswordLoginEnabled)
-	if err != nil {
-		return true
-	}
-	return enabled
-}
-
-func isPasswordRegisterEnabled(ctx context.Context) bool {
-	enabled, err := repository.GetBoolByKey(ctx, model.ConfigKeyPasswordRegisterEnabled)
 	if err != nil {
 		return true
 	}
@@ -71,6 +65,24 @@ func isRegistrationEnabled(ctx context.Context) bool {
 		return true
 	}
 	return enabled
+}
+
+func registrationEmailAllowed(ctx context.Context, email string) bool {
+	config, err := repository.GetSystemConfigByKey(ctx, model.ConfigKeyRegistrationEmailDomainAllowlist)
+	if err != nil || strings.TrimSpace(config.Value) == "" {
+		return true
+	}
+	parts := strings.SplitN(model.NormalizeEmail(email), "@", userEmailParts)
+	if len(parts) != userEmailParts {
+		return false
+	}
+	for _, item := range strings.Split(config.Value, ",") {
+		allowed := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(item)), "@")
+		if allowed != "" && (parts[1] == allowed || strings.HasSuffix(parts[1], "."+allowed)) {
+			return true
+		}
+	}
+	return false
 }
 
 func isEmailLoginVerificationEnabled(ctx context.Context) bool {
@@ -217,6 +229,9 @@ func sendRegisterEmailCode(ctx context.Context, email string) error {
 	if email == "" {
 		return errors.New(errEmailRequired)
 	}
+	if !registrationEmailAllowed(ctx, email) {
+		return errors.New("该邮箱域名不在允许注册的白名单中")
+	}
 
 	count, err := repository.CountUsersByEmail(ctx, email)
 	if err != nil {
@@ -254,7 +269,7 @@ func updateUserProfile(ctx context.Context, userID uint64, input updateProfileIn
 		return nil, errors.New(errUserNotFound)
 	}
 
-	input.Email = strings.TrimSpace(input.Email)
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 	if input.Email != "" && input.Email != dbUser.Email {
 		if !strings.Contains(input.Email, "@") || !strings.Contains(input.Email, ".") {
 			return nil, errors.New(errEmailFormatInvalid)
@@ -274,6 +289,7 @@ func updateUserProfile(ctx context.Context, userID uint64, input updateProfileIn
 		dbUser.Nickname = dbUser.Username
 	}
 	dbUser.Email = input.Email
+	dbUser.EmailNormalized = model.NormalizeEmail(input.Email)
 	dbUser.AvatarURL = input.AvatarURL
 	dbUser.Bio = input.Bio
 	dbUser.Phone = strings.TrimSpace(input.Phone)

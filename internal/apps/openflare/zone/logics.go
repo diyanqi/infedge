@@ -6,7 +6,10 @@ package zone
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"net"
 	"strings"
 	"time"
 
@@ -16,9 +19,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	zoneVerificationStatusVerified = "verified"
+	verificationTokenBytes         = 24
+)
+
 // Input is the mutable Zone payload.
 type Input struct {
-	Domain string `json:"domain"`
+	Domain          string `json:"domain"`
+	ClaimsOwnership bool   `json:"claims_ownership"`
 }
 
 // DomainInput is the mutable Zone-domain payload.
@@ -77,7 +86,13 @@ func create(ctx context.Context, ownerID uint64, input Input) (*model.Zone, erro
 	if err != nil || root != domain {
 		return nil, errors.New(errZoneRootInvalid)
 	}
-	zone := &model.Zone{Domain: domain, OwnerID: ownerID}
+	zone := &model.Zone{
+		Domain:             domain,
+		OwnerID:            ownerID,
+		ClaimsOwnership:    input.ClaimsOwnership,
+		VerificationStatus: "pending",
+		VerificationToken:  newVerificationToken(),
+	}
 	if err := repository.CreateZone(ctx, zone); err != nil {
 		if isUnique(err) {
 			return nil, errors.New(errDomainExists)
@@ -202,6 +217,18 @@ func CreateOwnedDomain(ctx context.Context, zoneID uint, userID uint64, input Do
 	return CreateDomain(ctx, zoneID, input)
 }
 
+// UpdateOwnedDomain updates a domain and keeps all ownership checks in the
+// owner-scoped path used by the ordinary-user console.
+func UpdateOwnedDomain(ctx context.Context, zoneID, domainID uint, userID uint64, input DomainInput) (*model.ZoneDomain, error) {
+	if _, err := repository.GetOwnedZoneByID(ctx, zoneID, userID); err != nil {
+		return nil, err
+	}
+	if _, err := repository.GetZoneDomainByZoneAndID(ctx, zoneID, domainID); err != nil {
+		return nil, err
+	}
+	return UpdateDomain(ctx, zoneID, domainID, input)
+}
+
 // GetOverview returns a Zone and its domains.
 func GetOverview(ctx context.Context, id uint) (*Overview, error) {
 	zone, err := repository.GetZoneByID(ctx, id)
@@ -234,7 +261,21 @@ func CreateDomain(ctx context.Context, zoneID uint, input DomainInput) (*model.Z
 			return nil, errors.New(errCertificateNotFound)
 		}
 	}
-	item := &model.ZoneDomain{ZoneID: zoneID, Domain: domain, CertID: input.CertID}
+	status := "pending"
+	var verifiedAt *time.Time
+	if zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
+		status = zoneVerificationStatusVerified
+		now := time.Now().UTC()
+		verifiedAt = &now
+	}
+	item := &model.ZoneDomain{
+		ZoneID:             zoneID,
+		Domain:             domain,
+		CertID:             input.CertID,
+		VerificationStatus: status,
+		VerificationToken:  newVerificationToken(),
+		VerifiedAt:         verifiedAt,
+	}
 	if err := repository.CreateZoneDomain(ctx, item); err != nil {
 		if isUnique(err) {
 			return nil, errors.New(errDomainExists)
@@ -242,6 +283,101 @@ func CreateDomain(ctx context.Context, zoneID uint, input DomainInput) (*model.Z
 		return nil, err
 	}
 	return item, nil
+}
+
+// VerifyOwnedZone checks the TXT record proving control of a root domain.
+func VerifyOwnedZone(ctx context.Context, id uint, ownerID uint64) (*model.Zone, error) {
+	zone, err := repository.GetOwnedZoneByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if !zone.ClaimsOwnership {
+		return nil, errors.New("该根域未声明拥有全部权利，请逐个验证子域")
+	}
+	if err := verifyTXT(ctx, "_openflare-verification."+zone.Domain, zone.VerificationToken); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	zone.VerificationStatus, zone.VerifiedAt = zoneVerificationStatusVerified, &now
+	if err := repository.SaveZone(ctx, zone); err != nil {
+		return nil, err
+	}
+	return zone, nil
+}
+
+// VerifyOwnedDomain checks the TXT record proving control of one hostname.
+func VerifyOwnedDomain(ctx context.Context, zoneID, domainID uint, ownerID uint64) (*model.ZoneDomain, error) {
+	zone, err := repository.GetOwnedZoneByID(ctx, zoneID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	domain, err := repository.GetZoneDomainByZoneAndID(ctx, zoneID, domainID)
+	if err != nil {
+		return nil, err
+	}
+	if zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
+		now := time.Now().UTC()
+		domain.VerificationStatus, domain.VerifiedAt = zoneVerificationStatusVerified, &now
+	} else {
+		if err := verifyTXT(ctx, "_openflare-verification."+domain.Domain, domain.VerificationToken); err != nil {
+			return nil, err
+		}
+		now := time.Now().UTC()
+		domain.VerificationStatus, domain.VerifiedAt = zoneVerificationStatusVerified, &now
+	}
+	if err := repository.SaveZoneDomain(ctx, domain); err != nil {
+		return nil, err
+	}
+	return domain, nil
+}
+
+// EnsureOwnedDomainsReady checks verification and the fixed CNAME before deploy.
+func EnsureOwnedDomainsReady(ctx context.Context, ownerID uint64) error {
+	domains, err := repository.ListOwnedZoneDomains(ctx, ownerID)
+	if err != nil {
+		return err
+	}
+	for _, domain := range domains {
+		if domain.ProxyRouteID == nil {
+			continue
+		}
+		if domain.VerificationStatus != zoneVerificationStatusVerified {
+			return errors.New("域名 " + domain.Domain + " 尚未完成 DNS TXT 所有权验证")
+		}
+		if err := checkCNAME(ctx, domain.Domain); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func newVerificationToken() string {
+	buf := make([]byte, verificationTokenBytes)
+	if _, err := rand.Read(buf); err != nil {
+		return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
+	}
+	return hex.EncodeToString(buf)
+}
+
+func verifyTXT(ctx context.Context, name, expected string) error {
+	records, err := net.DefaultResolver.LookupTXT(ctx, name)
+	if err != nil {
+		return errors.New("未找到 DNS TXT 验证记录，请稍后重试")
+	}
+	for _, record := range records {
+		if strings.TrimSpace(record) == expected {
+			return nil
+		}
+	}
+	return errors.New("DNS TXT 验证值不匹配")
+}
+
+func checkCNAME(ctx context.Context, domain string) error {
+	target, err := net.DefaultResolver.LookupCNAME(ctx, domain)
+	if err != nil || strings.TrimSuffix(strings.ToLower(strings.TrimSpace(target)), ".") != "cname.edge.infvar.com" {
+		return errors.New("域名必须将 CNAME 指向 cname.edge.infvar.com；禁止自行优选 IP，该地址已每小时进行全国拨测优选")
+	}
+	return nil
 }
 
 // UpdateDomain replaces a Zone-domain's mutable fields.

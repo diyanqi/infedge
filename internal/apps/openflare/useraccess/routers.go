@@ -38,6 +38,9 @@ func RegisterRoutes(api *gin.RouterGroup) {
 	group.POST("/zones/:id/update", UpdateZone)
 	group.POST("/zones/:id/delete", DeleteZone)
 	group.POST("/zones/:id/domains", CreateDomain)
+	group.POST("/zones/:id/domains/:domain_id/update", UpdateDomain)
+	group.POST("/zones/:id/verify", VerifyZone)
+	group.POST("/zones/:id/domains/:domain_id/verify", VerifyDomain)
 	group.GET("/origins", ListOrigins)
 	group.POST("/origins", CreateOrigin)
 	group.POST("/origins/:id/update", UpdateOrigin)
@@ -48,6 +51,9 @@ func RegisterRoutes(api *gin.RouterGroup) {
 	group.POST("/proxy-routes/:id/update", UpdateRoute)
 	group.POST("/proxy-routes/:id/delete", DeleteRoute)
 	group.POST("/publish", Publish)
+	registerPagesRoutes(group)
+	registerWAFRoutes(group)
+	registerTLSRoutes(group)
 }
 
 func userID(c *gin.Context) uint64 { return oauth.GetUserIDFromContext(c) }
@@ -204,8 +210,77 @@ func CreateDomain(c *gin.Context) {
 	if !bind(c, &input) {
 		return
 	}
+	if input.CertID != nil {
+		if _, err := repository.GetOwnedTLSCertificateByID(c.Request.Context(), *input.CertID, userID(c)); err != nil {
+			response.AbortNotFound(c, "证书不存在")
+			return
+		}
+	}
 	row, err := zone.CreateOwnedDomain(c.Request.Context(), id, userID(c), input)
 	respond(c, row, err)
+}
+
+// UpdateDomain updates the certificate assigned to an owned child domain.
+// @Summary 更新我的子域配置
+// @Tags custom-resources
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "Zone ID"
+// @Param domain_id path int true "域名 ID"
+// @Param body body zone.DomainInput true "域名参数"
+// @Success 200 {object} response.Any{data=model.ZoneDomain}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Failure 404 {object} response.Any
+// @Router /api/v1/custom/resources/zones/{id}/domains/{domain_id}/update [post]
+func UpdateDomain(c *gin.Context) {
+	zoneID, ok := parseID(c)
+	if !ok {
+		return
+	}
+	domainID, err := strconv.ParseUint(c.Param("domain_id"), 10, 32)
+	if err != nil || domainID == 0 {
+		response.AbortBadRequest(c, "ID 无效")
+		return
+	}
+	var input zone.DomainInput
+	if !bind(c, &input) {
+		return
+	}
+	if input.CertID != nil {
+		if _, err := repository.GetOwnedTLSCertificateByID(c.Request.Context(), *input.CertID, userID(c)); err != nil {
+			response.AbortNotFound(c, "证书不存在")
+			return
+		}
+	}
+	row, err := zone.UpdateOwnedDomain(c.Request.Context(), zoneID, uint(domainID), userID(c), input)
+	respond(c, row, err)
+}
+
+// VerifyZone verifies a root domain through DNS TXT.
+func VerifyZone(c *gin.Context) {
+	zoneID, ok := parseID(c)
+	if !ok {
+		return
+	}
+	row, err := zone.VerifyOwnedZone(c.Request.Context(), zoneID, userID(c))
+	respond(c, row, err)
+}
+
+// VerifyDomain verifies a child domain through DNS TXT.
+func VerifyDomain(c *gin.Context) {
+	zoneID, ok := parseID(c)
+	if !ok {
+		return
+	}
+	domainID, err := strconv.ParseUint(c.Param("domain_id"), 10, 32)
+	if err != nil {
+		response.AbortBadRequest(c, "ID 无效")
+		return
+	}
+	row, verifyErr := zone.VerifyOwnedDomain(c.Request.Context(), zoneID, uint(domainID), userID(c))
+	respond(c, row, verifyErr)
 }
 
 // ListOrigins lists the current user's origins.
@@ -417,6 +492,10 @@ func DeleteRoute(c *gin.Context) {
 // @Router /api/v1/custom/resources/publish [post]
 func Publish(c *gin.Context) {
 	uid := userID(c)
+	if err := zone.EnsureOwnedDomainsReady(c.Request.Context(), uid); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
 	row, err := config_version.PublishForUser(c.Request.Context(), uid, strconv.FormatUint(uid, 10), false)
 	respond(c, row, err)
 }

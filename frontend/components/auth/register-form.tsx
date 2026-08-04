@@ -64,9 +64,10 @@ export function RegisterForm() {
     [searchParams],
   );
 
-  const registrationEnabled =
-    configBool(publicConfigQuery.data?.registration_enabled, false) &&
-    configBool(publicConfigQuery.data?.password_register_enabled, false);
+  const registrationEnabled = configBool(
+    publicConfigQuery.data?.registration_enabled,
+    false,
+  );
 
   const emailRegisterEnabled = configBool(
     publicConfigQuery.data?.email_register_verification_enabled,

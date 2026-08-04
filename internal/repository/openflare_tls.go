@@ -29,6 +29,15 @@ func ListTLSCertificates(ctx context.Context) ([]model.TLSCertificate, error) {
 	return certificates, nil
 }
 
+// ListOwnedTLSCertificates lists certificates owned by a user.
+func ListOwnedTLSCertificates(ctx context.Context, ownerID uint64) ([]model.TLSCertificate, error) {
+	var certificates []model.TLSCertificate
+	if err := db.DB(ctx).Where("owner_id = ?", ownerID).Order("id desc").Find(&certificates).Error; err != nil {
+		return nil, err
+	}
+	return certificates, nil
+}
+
 // GetTLSCertificateByID 按 ID 查询证书。
 func GetTLSCertificateByID(ctx context.Context, id uint) (*model.TLSCertificate, error) {
 	conn := db.DB(ctx)
@@ -37,6 +46,15 @@ func GetTLSCertificateByID(ctx context.Context, id uint) (*model.TLSCertificate,
 	}
 	var certificate model.TLSCertificate
 	if err := conn.First(&certificate, id).Error; err != nil {
+		return nil, err
+	}
+	return &certificate, nil
+}
+
+// GetOwnedTLSCertificateByID loads a certificate only for its owner.
+func GetOwnedTLSCertificateByID(ctx context.Context, id uint, ownerID uint64) (*model.TLSCertificate, error) {
+	var certificate model.TLSCertificate
+	if err := db.DB(ctx).Where("id = ? AND owner_id = ?", id, ownerID).First(&certificate).Error; err != nil {
 		return nil, err
 	}
 	return &certificate, nil

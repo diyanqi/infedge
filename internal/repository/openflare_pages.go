@@ -24,10 +24,28 @@ func ListPagesProjects(ctx context.Context) ([]model.PagesProject, error) {
 	return projects, nil
 }
 
+// ListPagesProjectsByOwner lists only projects owned by one user.
+func ListPagesProjectsByOwner(ctx context.Context, ownerID uint64) ([]model.PagesProject, error) {
+	var projects []model.PagesProject
+	if err := db.DB(ctx).Where("owner_id = ?", ownerID).Order("id desc").Find(&projects).Error; err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
 // GetPagesProjectByID 按 ID 查询 Pages 项目。
 func GetPagesProjectByID(ctx context.Context, id uint) (*model.PagesProject, error) {
 	var project model.PagesProject
 	if err := db.DB(ctx).First(&project, id).Error; err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+// GetPagesProjectByIDAndOwner scopes a project to its owner.
+func GetPagesProjectByIDAndOwner(ctx context.Context, id uint, ownerID uint64) (*model.PagesProject, error) {
+	var project model.PagesProject
+	if err := db.DB(ctx).Where("id = ? AND owner_id = ?", id, ownerID).First(&project).Error; err != nil {
 		return nil, err
 	}
 	return &project, nil
@@ -63,6 +81,17 @@ func GetPagesDeploymentByID(ctx context.Context, id uint) (*model.PagesDeploymen
 		return nil, err
 	}
 	return &deployment, nil
+}
+
+// GetPagesProjectByDeploymentIDAndOwner verifies a deployment belongs to an owner's project.
+func GetPagesProjectByDeploymentIDAndOwner(ctx context.Context, deploymentID uint, ownerID uint64) (*model.PagesProject, error) {
+	var project model.PagesProject
+	if err := db.DB(ctx).Joins("JOIN of_pages_deployments ON of_pages_deployments.project_id = of_pages_projects.id").
+		Where("of_pages_deployments.id = ? AND of_pages_projects.owner_id = ?", deploymentID, ownerID).
+		First(&project).Error; err != nil {
+		return nil, err
+	}
+	return &project, nil
 }
 
 // ListPagesDeploymentFiles 列出部署文件清单。

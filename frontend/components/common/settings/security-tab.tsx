@@ -104,6 +104,8 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
 
   const [sessionTTL, setSessionTTL] = useState('168');
   const [customHours, setCustomHours] = useState('');
+  const [registrationEmailAllowlist, setRegistrationEmailAllowlist] =
+    useState('');
 
   const authSourcesQuery = useQuery({
     queryKey: ['auth', 'sources'],
@@ -119,6 +121,9 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
       setCapTTL(cfgMap['cap_challenge_ttl_seconds']?.value || '600');
       setCapTokenTTL(cfgMap['cap_token_ttl_seconds']?.value || '1200');
       setCapAutoSolve(cfgMap['cap_auto_solve']?.value !== 'false');
+      setRegistrationEmailAllowlist(
+        cfgMap['registration_email_domain_allowlist']?.value || '',
+      );
 
       // 初始化登录保持设置
       const ttlVal = cfgMap['login_session_ttl_hours']?.value || '0';
@@ -247,6 +252,27 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
     updateConfigMutation.mutate({ key, value: checked });
   };
 
+  const saveRegistrationEmailAllowlist = useMutation({
+    mutationFn: async () => {
+      const config = configs['registration_email_domain_allowlist'];
+      if (!config) throw new Error('缺少配置项: registration_email_domain_allowlist');
+      await services.adminSystemConfig.updateSystemConfig(
+        'registration_email_domain_allowlist',
+        {
+          value: registrationEmailAllowlist,
+          description: config.description || '注册邮箱域名白名单',
+        },
+      );
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['admin', 'system-configs'],
+      });
+      toast.success('注册邮箱白名单已更新');
+    },
+    onError: (error: Error) => toast.error(error.message || '保存配置失败'),
+  });
+
   const saveCapMutation = useMutation({
     mutationFn: async () => {
       const updates = [
@@ -331,6 +357,33 @@ export function SecurityTab({ configs, systemConfigsQuery }: SecurityTabProps) {
                 </div>
               );
             })}
+
+            <div className='md:col-span-2 space-y-2 rounded-xl border border-dashed p-4'>
+              <div className='flex items-center gap-2'>
+                <Mail className='size-4 text-primary' />
+                <span className='font-medium text-sm'>注册邮箱域名白名单</span>
+              </div>
+              <p className='text-xs text-muted-foreground'>
+                逗号分隔，例如 example.com。留空表示不限制；邮箱的 +别名会自动去重。
+              </p>
+              <div className='flex gap-2'>
+                <Input
+                  value={registrationEmailAllowlist}
+                  onChange={(event) =>
+                    setRegistrationEmailAllowlist(event.target.value)
+                  }
+                  placeholder='example.com, example.org'
+                />
+                <Button
+                  type='button'
+                  variant='secondary'
+                  onClick={() => saveRegistrationEmailAllowlist.mutate()}
+                  disabled={saveRegistrationEmailAllowlist.isPending}
+                >
+                  保存
+                </Button>
+              </div>
+            </div>
 
             {/* 登录状态保持时间 (选择后立即更改) */}
             <div className='flex items-center justify-between gap-4 rounded-xl border border-dashed p-4 bg-card hover:bg-muted/10 hover:border-primary/30 transition-all duration-300 shadow-sm md:col-span-2'>

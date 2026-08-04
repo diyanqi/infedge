@@ -11,7 +11,9 @@ import (
 // OpenFlareWAFRuleGroup stores a WAF rule group.
 type OpenFlareWAFRuleGroup struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID   uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Name      string    `json:"name" gorm:"size:255;not null"`
+	Host      string    `json:"host" gorm:"size:255;not null;default:''"`
 	Enabled   bool      `json:"enabled" gorm:"not null;default:true"`
 	IsGlobal  bool      `json:"is_global" gorm:"not null;default:false;index"`
 	Graph     string    `json:"graph" gorm:"type:text;not null;default:''"`

@@ -190,7 +190,7 @@ func Login(c *gin.Context) {
 // @Router /api/v1/user/register [post]
 func Register(c *gin.Context) {
 	ctx := c.Request.Context()
-	if !isRegistrationEnabled(ctx) || !isPasswordRegisterEnabled(ctx) {
+	if !isRegistrationEnabled(ctx) {
 		response.AbortBadRequest(c, errRegistrationDisabled)
 		return
 	}
@@ -205,7 +205,7 @@ func Register(c *gin.Context) {
 	req.Password = strings.TrimSpace(req.Password)
 	req.Nickname = strings.TrimSpace(req.Nickname)
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
-	req.Email = strings.TrimSpace(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.Code = strings.TrimSpace(req.Code)
 
 	if req.Username == "" || req.Password == "" {
@@ -214,6 +214,10 @@ func Register(c *gin.Context) {
 	}
 	if req.Email == "" {
 		response.AbortBadRequest(c, errEmailRequired)
+		return
+	}
+	if !registrationEmailAllowed(ctx, req.Email) {
+		response.AbortBadRequest(c, "该邮箱域名不在允许注册的白名单中")
 		return
 	}
 	if len(req.Password) < minPasswordLength {
@@ -228,14 +232,15 @@ func Register(c *gin.Context) {
 	}
 
 	user := model.User{
-		ID:          idgen.NextUint64ID(),
-		Username:    req.Username,
-		Nickname:    req.Nickname,
-		Email:       req.Email,
-		AvatarURL:   "",
-		IsActive:    true,
-		IsAdmin:     false,
-		LastLoginAt: time.Now(),
+		ID:              idgen.NextUint64ID(),
+		Username:        req.Username,
+		Nickname:        req.Nickname,
+		Email:           req.Email,
+		EmailNormalized: model.NormalizeEmail(req.Email),
+		AvatarURL:       "",
+		IsActive:        true,
+		IsAdmin:         false,
+		LastLoginAt:     time.Now(),
 	}
 	if user.Nickname == "" {
 		user.Nickname = req.DisplayName
@@ -365,9 +370,13 @@ func SendEmailCode(c *gin.Context) {
 		return
 	}
 
-	req.Email = strings.TrimSpace(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	if req.Email == "" {
 		response.AbortBadRequest(c, errEmailRequired)
+		return
+	}
+	if !registrationEmailAllowed(c.Request.Context(), req.Email) {
+		response.AbortBadRequest(c, "该邮箱域名不在允许注册的白名单中")
 		return
 	}
 

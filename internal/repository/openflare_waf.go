@@ -35,6 +35,19 @@ func ListOpenFlareWAFRuleGroups(ctx context.Context) ([]*model.OpenFlareWAFRuleG
 	return groups, nil
 }
 
+// ListOpenFlareWAFRuleGroupsForOwner returns global rules and the user's rules.
+func ListOpenFlareWAFRuleGroupsForOwner(ctx context.Context, ownerID uint64) ([]*model.OpenFlareWAFRuleGroup, error) {
+	conn, err := wafDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var groups []*model.OpenFlareWAFRuleGroup
+	if err := conn.Where("is_global = ? OR owner_id = ?", true, ownerID).Order("is_global desc").Order("id asc").Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
 // GetOpenFlareWAFRuleGroupByID returns a rule group by id.
 func GetOpenFlareWAFRuleGroupByID(ctx context.Context, id uint) (*model.OpenFlareWAFRuleGroup, error) {
 	conn, err := wafDB(ctx)
@@ -43,6 +56,19 @@ func GetOpenFlareWAFRuleGroupByID(ctx context.Context, id uint) (*model.OpenFlar
 	}
 	var group model.OpenFlareWAFRuleGroup
 	if err = conn.First(&group, id).Error; err != nil {
+		return nil, err
+	}
+	return &group, nil
+}
+
+// GetOpenFlareWAFRuleGroupForOwner scopes global and private rules.
+func GetOpenFlareWAFRuleGroupForOwner(ctx context.Context, id uint, ownerID uint64) (*model.OpenFlareWAFRuleGroup, error) {
+	conn, err := wafDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var group model.OpenFlareWAFRuleGroup
+	if err := conn.Where("id = ? AND (is_global = ? OR owner_id = ?)", id, true, ownerID).First(&group).Error; err != nil {
 		return nil, err
 	}
 	return &group, nil
@@ -78,9 +104,21 @@ func UpdateOpenFlareWAFRuleGroup(ctx context.Context, group *model.OpenFlareWAFR
 	}
 	return conn.Model(&model.OpenFlareWAFRuleGroup{}).Where("id = ?", group.ID).Updates(map[string]any{
 		"name":      group.Name,
+		"host":      group.Host,
+		"owner_id":  group.OwnerID,
 		colEnabled:  group.Enabled,
 		"is_global": group.IsGlobal,
 	}).Error
+}
+
+// UpdateOpenFlareWAFRuleGroupForOwner updates only a user's private group.
+func UpdateOpenFlareWAFRuleGroupForOwner(ctx context.Context, group *model.OpenFlareWAFRuleGroup, ownerID uint64) error {
+	conn, err := wafDB(ctx)
+	if err != nil {
+		return err
+	}
+	return conn.Model(&model.OpenFlareWAFRuleGroup{}).Where("id = ? AND owner_id = ? AND is_global = ?", group.ID, ownerID, false).
+		Updates(map[string]any{"name": group.Name, "host": group.Host, colEnabled: group.Enabled}).Error
 }
 
 // UpdateOpenFlareWAFRuleGraph atomically replaces a graph when revision is current.
@@ -168,7 +206,7 @@ func UpdateOpenFlareWAFIPGroup(ctx context.Context, group *model.OpenFlareWAFIPG
 		return err
 	}
 	return conn.Model(&model.OpenFlareWAFIPGroup{}).Where("id = ?", group.ID).Updates(map[string]any{
-		"name":                      group.Name,
+		colName:                     group.Name,
 		"type":                      group.Type,
 		colEnabled:                  group.Enabled,
 		"ip_list":                   group.IPList,

@@ -55,12 +55,18 @@ export interface ResourceZone {
   domain_count?: number;
   created_at: string;
   updated_at: string;
+  claims_ownership?: boolean;
+  verification_status?: string;
+  verification_token?: string;
 }
 export interface ResourceDomain {
   id: number;
   zone_id: number;
   domain: string;
   proxy_route_id?: number | null;
+  verification_status?: string;
+  verification_token?: string;
+  cert_id?: number | null;
 }
 export interface ResourceOrigin {
   id: number;
@@ -79,6 +85,50 @@ export interface ResourceRoute {
   upstream_list: string[];
   enabled: boolean;
   upstream_type: string;
+  enable_https?: boolean;
+  redirect_http?: boolean;
+  limit_rate?: string;
+  limit_req_per_ip?: string;
+  cache_enabled?: boolean;
+  cache_policy?: string;
+  origin_host?: string;
+  limit_conn_per_server?: number;
+  limit_conn_per_ip?: number;
+  basic_auth_enabled?: boolean;
+  basic_auth_username?: string;
+  pages_project_id?: number | null;
+}
+
+export interface ResourceCertificate {
+  id: number;
+  name: string;
+  remark?: string;
+  provider?: string;
+  expires_at?: string | null;
+}
+
+export interface ResourcePolicy {
+  cname: string;
+  global_rules: ResourceWafRule[];
+  default_limit_rate: string;
+  default_limit_req_per_ip: string;
+}
+
+export interface ResourceWafRule {
+  id: number;
+  name: string;
+  host: string;
+  enabled: boolean;
+  is_global: boolean;
+  applied_site_count?: number;
+}
+
+export interface ResourceRouteWaf {
+  route_id: number;
+  global_rule_group?: ResourceWafRule | null;
+  rule_groups: ResourceWafRule[];
+  applied_rule_groups: ResourceWafRule[];
+  applied_ids: number[];
 }
 export interface PlanInput {
   name: string;

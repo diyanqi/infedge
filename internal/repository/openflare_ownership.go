@@ -58,6 +58,16 @@ func ListOwnedZones(ctx context.Context, userID uint64) ([]model.Zone, error) {
 	return rows, err
 }
 
+// ListOwnedZoneDomains returns all domains under zones owned by userID.
+func ListOwnedZoneDomains(ctx context.Context, userID uint64) ([]model.ZoneDomain, error) {
+	var domains []model.ZoneDomain
+	if err := db.DB(ctx).Joins("JOIN of_zones ON of_zones.id = of_zone_domains.zone_id").
+		Where("of_zones.owner_id = ?", userID).Order("of_zone_domains.domain asc").Find(&domains).Error; err != nil {
+		return nil, err
+	}
+	return domains, nil
+}
+
 // GetOwnedZoneByID returns a zone only when it belongs to userID.
 func GetOwnedZoneByID(ctx context.Context, id uint, userID uint64) (*model.Zone, error) {
 	var row model.Zone

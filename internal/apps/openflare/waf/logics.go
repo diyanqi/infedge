@@ -182,6 +182,46 @@ func GetSiteRuleGroups(ctx context.Context, routeID uint) (*SiteRuleGroupsView, 
 	}, nil
 }
 
+// GetSiteRuleGroupsForOwner hides private rules belonging to other users.
+func GetSiteRuleGroupsForOwner(ctx context.Context, routeID uint, ownerID uint64) (*SiteRuleGroupsView, error) {
+	if _, err := repository.GetOwnedProxyRouteByID(ctx, routeID, ownerID); err != nil {
+		return nil, err
+	}
+	groups, err := ListRulesForOwner(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	appliedIDs, err := ListSiteRuleGroupIDs(ctx, routeID)
+	if err != nil {
+		return nil, err
+	}
+	var global *RuleView
+	custom := make([]RuleView, 0, len(groups))
+	applied := make([]RuleView, 0, len(appliedIDs))
+	byID := make(map[uint]RuleView, len(groups))
+	for _, group := range groups {
+		if group.IsGlobal {
+			item := group
+			global = &item
+			continue
+		}
+		custom = append(custom, group)
+		byID[group.ID] = group
+	}
+	for _, id := range appliedIDs {
+		if group, ok := byID[id]; ok {
+			applied = append(applied, group)
+		}
+	}
+	return &SiteRuleGroupsView{RouteID: routeID, GlobalRuleGroup: global, RuleGroups: custom, AppliedRuleGroups: applied, AppliedIDs: func() []uint {
+		ids := make([]uint, 0, len(applied))
+		for _, item := range applied {
+			ids = append(ids, item.ID)
+		}
+		return ids
+	}()}, nil
+}
+
 // ReplaceSiteRuleGroups replaces rule group bindings for a proxy route.
 func ReplaceSiteRuleGroups(ctx context.Context, routeID uint, groupIDs []uint) (*SiteRuleGroupsView, error) {
 	if _, err := repository.GetOpenFlareProxyRouteByID(ctx, routeID); err != nil {

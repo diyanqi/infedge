@@ -10,6 +10,7 @@ import (
 // TLSCertificate OpenFlare TLS 证书实体。
 type TLSCertificate struct {
 	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID       uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Name          string    `json:"name" gorm:"uniqueIndex;size:255;not null"`
 	CertPEM       string    `json:"-" gorm:"type:text;not null"`
 	KeyPEM        string    `json:"-" gorm:"type:text;not null"`
