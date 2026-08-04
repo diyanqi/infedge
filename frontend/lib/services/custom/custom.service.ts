@@ -4,6 +4,7 @@ import type {
   PaymentChannel,
   PaymentOrder,
   PlanInput,
+  RedeemCode,
   ResourceDomain,
   ResourceOrigin,
   ResourceRoute,
