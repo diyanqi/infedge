@@ -5,7 +5,6 @@ import type {
   PaymentOrder,
   PlanInput,
   ResourceDomain,
-  ResourceNodeGroup,
   ResourceOrigin,
   ResourceRoute,
   ResourceZone,
@@ -26,6 +25,9 @@ export class CustomService extends BaseService {
   }
   static listOrders(): Promise<PaymentOrder[]> {
     return this.get('/orders');
+  }
+  static redeem(code: string): Promise<UserSubscription> {
+    return this.post('/redeem', { code });
   }
   static createOrder(
     planId: number,
@@ -96,6 +98,12 @@ export class CustomService extends BaseService {
   static adminDeletePlan(id: number): Promise<void> {
     return this.delete(`/admin/plans/${id}`);
   }
+  static adminListRedeemCodes(): Promise<RedeemCode[]> {
+    return this.get('/admin/redeem-codes');
+  }
+  static adminCreateRedeemCode(planId: number): Promise<RedeemCode> {
+    return this.post('/admin/redeem-codes', { plan_id: planId });
+  }
   static adminListChannels(): Promise<PaymentChannel[]> {
     return this.get('/admin/payment/channels');
   }
@@ -110,24 +118,5 @@ export class CustomService extends BaseService {
   }
   static adminDeleteChannel(id: number): Promise<void> {
     return this.delete(`/admin/payment/channels/${id}`);
-  }
-  static listNodeGroups(): Promise<ResourceNodeGroup[]> {
-    return this.get('/node-groups');
-  }
-  static createNodeGroup(payload: {
-    name: string;
-    monthly_bytes_limit: number;
-    node_ids: number[];
-  }): Promise<ResourceNodeGroup> {
-    return this.post('/node-groups', payload);
-  }
-  static updateNodeGroup(
-    id: number,
-    payload: { name: string; monthly_bytes_limit: number; node_ids: number[] },
-  ): Promise<ResourceNodeGroup> {
-    return this.put(`/node-groups/${id}`, payload);
-  }
-  static deleteNodeGroup(id: number): Promise<void> {
-    return this.delete(`/node-groups/${id}`);
   }
 }

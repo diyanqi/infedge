@@ -95,7 +95,7 @@ func GetCacheableUploadByID(ctx context.Context, id uint64) (model.Upload, error
 // GetUploadByIDForUpdateTx loads and row-locks an upload by ID within an existing transaction.
 func GetUploadByIDForUpdateTx(tx *gorm.DB, id uint64) (model.Upload, error) {
 	var upload model.Upload
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+	if err := tx.Clauses(clause.Locking{Strength: pagesRowLockStrength}).
 		Where("id = ?", id).
 		First(&upload).Error; err != nil {
 		return model.Upload{}, err

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"net/url"
 	"sort"
 	"strconv"
@@ -20,11 +21,14 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/repository"
+	"gorm.io/gorm"
 )
 
 const (
-	easyPayFenPerYuan = 100
-	orderRandomBytes  = 5
+	easyPayFenPerYuan  = 100
+	orderRandomBytes   = 5
+	redeemCodeLength   = 16
+	redeemCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 )
 
 type PlanInput struct {
@@ -51,6 +55,14 @@ type ChannelInput struct {
 	Sort      int    `json:"sort"`
 }
 
+type CreateRedeemCodeInput struct {
+	PlanID uint `json:"plan_id" binding:"required"`
+}
+
+type RedeemRequest struct {
+	Code string `json:"code" binding:"required,max=64"`
+}
+
 func planFromInput(input PlanInput) *model.SubscriptionPlan {
 	return &model.SubscriptionPlan{
 		Name: input.Name, Description: input.Description, PriceFen: input.PriceFen,
@@ -63,6 +75,55 @@ func planFromInput(input PlanInput) *model.SubscriptionPlan {
 
 func channelFromInput(input ChannelInput) *model.PaymentChannel {
 	return &model.PaymentChannel{Name: input.Name, Gateway: strings.TrimRight(input.Gateway, "/"), PID: input.PID, SecretKey: input.SecretKey, Enabled: input.Enabled, Sort: input.Sort}
+}
+
+func GenerateRedeemCode(ctx context.Context, planID uint) (*model.RedeemCode, error) {
+	plan, err := repository.GetSubscriptionPlanByID(ctx, planID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(errPlanNotFound)
+		}
+		return nil, err
+	}
+	if !plan.Enabled {
+		return nil, errors.New(errPlanDisabled)
+	}
+	code, err := newRedeemCode()
+	if err != nil {
+		return nil, err
+	}
+	row := &model.RedeemCode{
+		Code: code, PlanID: plan.ID, Plan: plan, Status: model.RedeemCodeStatusUnused,
+	}
+	if err := repository.CreateRedeemCode(ctx, row); err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
+func RedeemPlan(ctx context.Context, userID uint64, rawCode string, now time.Time) (*model.UserSubscription, error) {
+	code := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(rawCode), "-", ""))
+	if code == "" {
+		return nil, errors.New(errRedeemCodeInvalid)
+	}
+	subscription, err := repository.RedeemSubscriptionWithCode(ctx, code, userID, now)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New(errRedeemCodeInvalid)
+	}
+	return subscription, err
+}
+
+func newRedeemCode() (string, error) {
+	code := make([]byte, redeemCodeLength)
+	max := big.NewInt(int64(len(redeemCodeAlphabet)))
+	for i := range code {
+		value, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", err
+		}
+		code[i] = redeemCodeAlphabet[value.Int64()]
+	}
+	return string(code), nil
 }
 
 func CreateOrder(ctx context.Context, userID uint64, planID, channelID uint, notifyURL, returnURL string) (string, *model.PaymentOrder, error) {

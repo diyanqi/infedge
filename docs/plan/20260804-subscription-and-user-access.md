@@ -10,8 +10,8 @@
 
 ## 实现范围
 
-1. 新增套餐、订阅、支付渠道/订单、节点组和用户资源归属模型及 PostgreSQL/SQLite 迁移。
-2. 新增管理员套餐和支付渠道配置 API、普通用户套餐/订单/资源 API。
+1. 新增套餐、订阅、支付渠道/订单、一次性套餐兑换码、节点组和用户资源归属模型及 PostgreSQL/SQLite 迁移。
+2. 新增管理员套餐、支付渠道和兑换码配置 API、普通用户套餐/订单/兑换码/资源 API。
 3. 为普通用户开放有套餐权益控制的 Zone、域名、源站、代理规则和配置发布；Pages 项目仍由管理员管理，待上传/部署 owner 链路单独完成后再开放。
 4. 扩展 agent 心跳协议传递节点/节点组和用户配额策略；访问日志携带 owner，Server 按自然月累计用户流量，Agent 按 owner 分摊并发限速。
 5. 更新 SMTP 设置、前端导航和品牌文案，补充设计文档和 changelog。
@@ -24,4 +24,4 @@
 
 已完成套餐/订阅、易支付多渠道、普通用户资源隔离、节点/节点组额度、SMTP 拆分、品牌更新，以及用户 owner 访问日志和月度流量统计。Pages owner 链路仍未开放，继续由管理员管理。
 
-验证运行 `make format`、相关 `go test`、前端 typecheck/lint 和 `make code-check`。
+验证运行 `make format`、相关 `go test`、前端 typecheck/lint 和 `make code-check`。兑换码核销覆盖重复请求和并发下的单次成功语义。

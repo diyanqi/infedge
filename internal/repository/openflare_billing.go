@@ -111,28 +111,42 @@ func CreatePaymentOrder(ctx context.Context, row *model.PaymentOrder) error {
 // ActivateSubscription grants a plan without a payment transaction.
 func ActivateSubscription(ctx context.Context, userID uint64, planID uint, now time.Time) error {
 	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		var plan model.SubscriptionPlan
-		if err := tx.First(&plan, planID).Error; err != nil {
-			return err
-		}
-		var current model.UserSubscription
-		if err := tx.Where("user_id = ? AND status = ?", userID, model.SubscriptionStatusActive).
-			Order("expires_at desc").First(&current).Error; err != nil && err != gorm.ErrRecordNotFound {
-			return err
-		}
-		start := now
-		if current.ID != 0 && current.ExpiresAt.After(start) {
-			start = current.ExpiresAt
-			current.Status = model.SubscriptionStatusExpired
-			if err := tx.Save(&current).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.UserSubscription{
-			UserID: userID, PlanID: plan.ID, Status: model.SubscriptionStatusActive,
-			StartsAt: start, ExpiresAt: start.AddDate(0, plan.BillingMonths, 0),
-		}).Error
+		_, err := activateSubscriptionTx(tx, userID, planID, 0, now)
+		return err
 	})
+}
+
+// activateSubscriptionTx activates a plan inside an existing transaction.
+// months=0 uses the plan billing period; a positive value overrides it.
+func activateSubscriptionTx(tx *gorm.DB, userID uint64, planID uint, months int, now time.Time) (*model.UserSubscription, error) {
+	var plan model.SubscriptionPlan
+	if err := tx.First(&plan, planID).Error; err != nil {
+		return nil, err
+	}
+	var current model.UserSubscription
+	if err := tx.Where("user_id = ? AND status = ?", userID, model.SubscriptionStatusActive).
+		Order("expires_at desc").First(&current).Error; err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	start := now
+	if current.ID != 0 && current.ExpiresAt.After(start) {
+		start = current.ExpiresAt
+		current.Status = model.SubscriptionStatusExpired
+		if err := tx.Save(&current).Error; err != nil {
+			return nil, err
+		}
+	}
+	if months <= 0 {
+		months = plan.BillingMonths
+	}
+	row := &model.UserSubscription{
+		UserID: userID, PlanID: plan.ID, Status: model.SubscriptionStatusActive,
+		StartsAt: start, ExpiresAt: start.AddDate(0, months, 0),
+	}
+	if err := tx.Create(row).Error; err != nil {
+		return nil, err
+	}
+	return row, nil
 }
 
 func GetPaymentOrderByOrderNo(ctx context.Context, orderNo string) (*model.PaymentOrder, error) {
@@ -158,7 +172,7 @@ func MarkPaymentOrderPaid(ctx context.Context, orderNo, tradeNo string, now time
 			return nil
 		}
 		if err := tx.Model(&order).Updates(map[string]any{
-			"status": model.PaymentOrderPaid, "trade_no": tradeNo, "paid_at": now,
+			columnStatus: model.PaymentOrderPaid, "trade_no": tradeNo, "paid_at": now,
 		}).Error; err != nil {
 			return err
 		}

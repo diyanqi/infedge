@@ -5,6 +5,7 @@
 package subscription
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,12 +26,15 @@ func RegisterRoutes(api *gin.RouterGroup, root *gin.Engine) {
 	user.GET("/subscription", GetMySubscription)
 	user.GET("/orders", ListMyOrders)
 	user.POST("/orders", CreateMyOrder)
+	user.POST("/redeem", Redeem)
 
 	adminGroup := api.Group("/admin", oauth.LoginRequired(), admin.LoginAdminRequired())
 	adminGroup.GET("/plans", ListPlans)
 	adminGroup.POST("/plans", CreatePlan)
 	adminGroup.PUT("/plans/:id", UpdatePlan)
 	adminGroup.DELETE("/plans/:id", DeletePlan)
+	adminGroup.GET("/redeem-codes", ListRedeemCodes)
+	adminGroup.POST("/redeem-codes", CreateRedeemCode)
 	adminGroup.GET("/payment/channels", ListChannels)
 	adminGroup.POST("/payment/channels", CreateChannel)
 	adminGroup.PUT("/payment/channels/:id", UpdateChannel)
@@ -154,6 +158,54 @@ func UpdatePlan(c *gin.Context) {
 // @Failure 401 {object} response.Any
 // @Router /api/v1/custom/admin/plans/{id} [delete]
 func DeletePlan(c *gin.Context) { deleteByID(c, true) }
+
+// ListRedeemCodes returns all subscription redemption codes for administrators.
+// @Summary 获取套餐兑换码
+// @Tags custom-subscription
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} response.Any{data=[]model.RedeemCode}
+// @Failure 401 {object} response.Any
+// @Failure 500 {object} response.Any
+// @Router /api/v1/custom/admin/redeem-codes [get]
+func ListRedeemCodes(c *gin.Context) {
+	rows, err := repository.ListRedeemCodes(c.Request.Context())
+	if err != nil {
+		response.AbortInternal(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, response.OK(rows))
+}
+
+// CreateRedeemCode creates a one-time code for one month of the selected plan.
+// @Summary 创建套餐兑换码
+// @Tags custom-subscription
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body subscription.CreateRedeemCodeInput true "兑换码参数"
+// @Success 200 {object} response.Any{data=model.RedeemCode}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Failure 500 {object} response.Any
+// @Router /api/v1/custom/admin/redeem-codes [post]
+func CreateRedeemCode(c *gin.Context) {
+	var input CreateRedeemCodeInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+	row, err := GenerateRedeemCode(c.Request.Context(), input.PlanID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || err.Error() == errPlanNotFound || err.Error() == errPlanDisabled {
+			response.AbortBadRequest(c, err.Error())
+			return
+		}
+		response.AbortInternal(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, response.OK(row))
+}
 
 // ListPublicChannels returns enabled payment channels without secrets.
 // @Summary 获取公开支付渠道
@@ -358,6 +410,35 @@ func ListMyOrders(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.OK(rows))
+}
+
+// Redeem exchanges a one-time code for one month of its subscription plan.
+// @Summary 兑换套餐码
+// @Tags custom-subscription
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body subscription.RedeemRequest true "兑换码"
+// @Success 200 {object} response.Any{data=model.UserSubscription}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Router /api/v1/custom/redeem [post]
+func Redeem(c *gin.Context) {
+	var req RedeemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+	subscription, err := RedeemPlan(c.Request.Context(), oauth.GetUserIDFromContext(c), req.Code, time.Now())
+	if err != nil {
+		if err.Error() == errRedeemCodeInvalid {
+			response.AbortBadRequest(c, err.Error())
+			return
+		}
+		response.AbortInternal(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, response.OK(subscription))
 }
 
 // Notify receives an EasyPay asynchronous payment callback.

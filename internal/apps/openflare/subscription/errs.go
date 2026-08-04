@@ -14,4 +14,5 @@ const (
 	errPaymentAmountMismatch = "支付金额不匹配"
 	errNoPaymentChannel      = "暂无可用支付渠道"
 	errNoSubscription        = "当前没有有效套餐"
+	errRedeemCodeInvalid     = "兑换码无效或已使用"
 )

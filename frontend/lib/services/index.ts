@@ -34,6 +34,7 @@ import {
   DashboardService,
   DnsAccountService,
   NodeService,
+  NodeGroupService,
   OptionService,
   OriginService,
   PagesService,
@@ -63,6 +64,7 @@ const services = {
   dbManage: DbManageService,
   push: PushService,
   openflareNode: NodeService,
+  openflareNodeGroup: NodeGroupService,
   openflareProxyRoute: ProxyRouteService,
   openflareConfigVersion: ConfigVersionService,
   openflareApplyLog: ApplyLogService,
@@ -217,6 +219,7 @@ export type {
 export {
   OpenFlareBaseService,
   NodeService,
+  NodeGroupService,
   ProxyRouteService,
   ConfigVersionService,
   ApplyLogService,

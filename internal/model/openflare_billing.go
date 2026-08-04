@@ -56,7 +56,7 @@ type PaymentChannel struct {
 	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	Name      string    `json:"name" gorm:"size:128;not null"`
 	Gateway   string    `json:"gateway" gorm:"size:512;not null"`
-	PID       string    `json:"pid" gorm:"size:128;not null"`
+	PID       string    `json:"pid" gorm:"column:pid;size:128;not null"`
 	SecretKey string    `json:"-" gorm:"size:255;not null"`
 	Enabled   bool      `json:"enabled" gorm:"not null;default:true;index"`
 	Sort      int       `json:"sort" gorm:"not null;default:0"`

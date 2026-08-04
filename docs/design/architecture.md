@@ -165,7 +165,7 @@ OpenResty 健康与连接数 --> 边缘健康（瞬时，不作 24h 业务总量
 * **节点与穿透**：`nodes` (节点), `tunnels` (隧道客户端), `node_system_profiles` (系统概况), `apply_logs` (应用日志).
 * **WAF 与安全**：`waf_rule_groups` (WAF规则组), `waf_ip_groups` (WAF IP组), `waf_rule_group_bindings` (网站WAF绑定).
 * **系统与账号**：`acme_accounts` (ACME账户), `dns_accounts` (DNS账户), `geoip_update_configs` (GeoIP更新配置).
-* **用户与配额**：`of_subscription_plans` (套餐), `of_user_subscriptions` (订阅), `of_payment_channels` / `of_payment_orders` (易支付), `of_node_groups` (节点组), 以及核心 CDN 资源上的 `owner_id`.
+* **用户与配额**：`of_subscription_plans` (套餐), `of_user_subscriptions` (订阅), `of_payment_channels` / `of_payment_orders` (易支付), `of_redeem_codes` (一次性套餐兑换码), `of_node_groups` (节点组), 以及核心 CDN 资源上的 `owner_id`.
 
 ---
 

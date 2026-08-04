@@ -1,6 +1,7 @@
 export { OpenFlareBaseService } from './base.service';
 
 export { NodeService } from './node.service';
+export { NodeGroupService } from './node-group.service';
 export { ProxyRouteService } from './proxy-route.service';
 export { ConfigVersionService } from './config-version.service';
 export { ApplyLogService } from './apply-log.service';

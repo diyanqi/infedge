@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CreditCard, Package, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  CreditCard,
+  Package,
+  Pencil,
+  Plus,
+  Ticket,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomService } from '@/lib/services/custom';
 import type { ChannelInput, PlanInput } from '@/lib/services/custom';
@@ -11,6 +19,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const initialPlan: PlanInput = {
   name: '',
@@ -35,12 +50,16 @@ const initialChannel: ChannelInput = {
   sort: 0,
 };
 
+const formatBytes = (value: number) =>
+  value <= 0 ? '不限' : `${(value / 1073741824).toFixed(2)} GB / 月`;
+
 export default function AdminPlansPage() {
   const qc = useQueryClient();
   const [plan, setPlan] = useState(initialPlan);
   const [editingPlan, setEditingPlan] = useState<number | null>(null);
   const [channel, setChannel] = useState(initialChannel);
   const [editingChannel, setEditingChannel] = useState<number | null>(null);
+  const [redeemPlanID, setRedeemPlanID] = useState('');
   const plans = useQuery({
     queryKey: ['custom', 'admin-plans'],
     queryFn: () => CustomService.adminListPlans(),
@@ -48,6 +67,10 @@ export default function AdminPlansPage() {
   const channels = useQuery({
     queryKey: ['custom', 'admin-channels'],
     queryFn: () => CustomService.adminListChannels(),
+  });
+  const redeemCodes = useQuery({
+    queryKey: ['custom', 'admin-redeem-codes'],
+    queryFn: () => CustomService.adminListRedeemCodes(),
   });
   const savePlan = useMutation({
     mutationFn: () =>
@@ -85,6 +108,15 @@ export default function AdminPlansPage() {
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['custom', 'admin-channels'] }),
   });
+  const createRedeemCode = useMutation({
+    mutationFn: () => CustomService.adminCreateRedeemCode(Number(redeemPlanID)),
+    onSuccess: async (code) => {
+      await redeemCodes.refetch();
+      toast.success(`兑换码已创建：${code.code}`);
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : '创建兑换码失败'),
+  });
   const numberField = (label: string, key: keyof PlanInput) => (
     <div>
       <Label>{label}</Label>
@@ -96,6 +128,10 @@ export default function AdminPlansPage() {
       />
     </div>
   );
+  const throttleKB = Math.max(
+    0,
+    Math.round(plan.throttle_bytes_per_sec / 1024),
+  );
 
   return (
     <div className='w-full space-y-6 py-6 px-1'>
@@ -103,6 +139,79 @@ export default function AdminPlansPage() {
         <Package className='size-5 text-primary' />
         <h1 className='text-2xl font-semibold tracking-tight'>套餐与支付</h1>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2 text-base'>
+            <Ticket className='size-4' />
+            创建兑换码
+          </CardTitle>
+        </CardHeader>
+        <CardContent className='flex flex-col gap-3 sm:flex-row sm:items-end'>
+          <div className='w-full sm:max-w-sm'>
+            <Label>兑换套餐</Label>
+            <Select value={redeemPlanID} onValueChange={setRedeemPlanID}>
+              <SelectTrigger>
+                <SelectValue placeholder='选择启用中的套餐' />
+              </SelectTrigger>
+              <SelectContent>
+                {(plans.data ?? [])
+                  .filter((item) => item.enabled)
+                  .map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => createRedeemCode.mutate()}
+            disabled={!redeemPlanID || createRedeemCode.isPending}
+          >
+            <Plus className='mr-2 size-4' />
+            {createRedeemCode.isPending ? '生成中...' : '生成兑换码'}
+          </Button>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-base'>兑换码记录</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-2'>
+          {(redeemCodes.data ?? []).map((item) => (
+            <div
+              key={item.id}
+              className='flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm'
+            >
+              <div>
+                <p className='font-mono font-medium'>{item.code}</p>
+                <p className='text-xs text-muted-foreground'>
+                  {item.plan?.name ?? `套餐 #${item.plan_id}`} ·{' '}
+                  {item.status === 'used'
+                    ? `已使用${item.used_at ? ` · ${new Date(item.used_at).toLocaleString()}` : ''}`
+                    : '未使用'}
+                </p>
+              </div>
+              <Button
+                variant='ghost'
+                size='icon'
+                title='复制兑换码'
+                aria-label='复制兑换码'
+                disabled={item.status === 'used'}
+                onClick={() => {
+                  void navigator.clipboard.writeText(item.code);
+                  toast.success('兑换码已复制');
+                }}
+              >
+                <Copy className='size-4' />
+              </Button>
+            </div>
+          ))}
+          {!redeemCodes.isLoading && !(redeemCodes.data ?? []).length ? (
+            <p className='text-sm text-muted-foreground'>暂无兑换码</p>
+          ) : null}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className='text-base'>
@@ -129,7 +238,21 @@ export default function AdminPlansPage() {
           {numberField('价格（分）', 'price_fen')}
           {numberField('周期（月）', 'billing_months')}
           {numberField('高速流量（字节）', 'high_speed_bytes')}
-          {numberField('超额速度（字节/秒）', 'throttle_bytes_per_sec')}
+          <div>
+            <Label>超额速度（KB/s）</Label>
+            <Input
+              type='number'
+              min='0'
+              value={String(throttleKB)}
+              onChange={(e) =>
+                setPlan({
+                  ...plan,
+                  throttle_bytes_per_sec:
+                    Math.max(0, Number(e.target.value)) * 1024,
+                })
+              }
+            />
+          </div>
           {numberField('每日发布次数，0不限', 'daily_publish_limit')}
           {numberField('Zone 数量', 'max_zones')}
           {numberField('源站数量', 'max_origins')}
@@ -177,8 +300,10 @@ export default function AdminPlansPage() {
                 </span>
               </div>
               <p className='text-xs text-muted-foreground'>
-                高速 {item.high_speed_bytes} 字节 · 超额{' '}
-                {item.throttle_bytes_per_sec} 字节/秒
+                高速 {formatBytes(item.high_speed_bytes)} · 超额{' '}
+                {item.throttle_bytes_per_sec <= 0
+                  ? '不额外限速'
+                  : `${(item.throttle_bytes_per_sec / 1024).toFixed(1)} KB/s`}
               </p>
               <div className='flex gap-2'>
                 <Button

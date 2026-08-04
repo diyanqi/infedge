@@ -114,7 +114,7 @@ func ClearZoneDomainProxyRouteBindingsTx(tx *gorm.DB, routeID uint) error {
 func ReplaceZoneDomainRouteBindingsTx(tx *gorm.DB, routeID uint, domainIDs []uint) error {
 	var requested []model.ZoneDomain
 	if len(domainIDs) > 0 {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		if err := tx.Clauses(clause.Locking{Strength: pagesRowLockStrength}).
 			Where("id IN ?", domainIDs).
 			Find(&requested).Error; err != nil {
 			return err

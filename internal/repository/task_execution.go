@@ -175,7 +175,7 @@ func MarkFailedTaskExecutionsSucceededTx(
 	return tx.Model(&model.TaskExecution{}).
 		Where("task_type = ? AND status = ?", taskType, model.TaskExecutionStatusFailed).
 		Updates(map[string]any{
-			"status":      model.TaskExecutionStatusSucceeded,
+			columnStatus:  model.TaskExecutionStatusSucceeded,
 			"result":      result,
 			"finished_at": finishedAt,
 		}).Error

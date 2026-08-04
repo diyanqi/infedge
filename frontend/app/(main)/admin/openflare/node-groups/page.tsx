@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CustomService } from '@/lib/services/custom';
+import { NodeGroupService } from '@/lib/services/openflare';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,7 @@ export default function NodeGroupsPage() {
   const [nodeIDs, setNodeIDs] = useState('');
   const groups = useQuery({
     queryKey: ['custom', 'node-groups'],
-    queryFn: () => CustomService.listNodeGroups(),
+    queryFn: () => NodeGroupService.list(),
   });
   const payload = () => ({
     name,
@@ -31,8 +31,8 @@ export default function NodeGroupsPage() {
   const save = useMutation({
     mutationFn: () =>
       editing
-        ? CustomService.updateNodeGroup(editing, payload())
-        : CustomService.createNodeGroup(payload()),
+        ? NodeGroupService.update(editing, payload())
+        : NodeGroupService.create(payload()),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['custom', 'node-groups'] });
       setEditing(null);
@@ -44,7 +44,7 @@ export default function NodeGroupsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : '保存失败'),
   });
   const remove = useMutation({
-    mutationFn: (id: number) => CustomService.deleteNodeGroup(id),
+    mutationFn: (id: number) => NodeGroupService.remove(id),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['custom', 'node-groups'] }),
   });

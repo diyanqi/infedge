@@ -93,6 +93,22 @@ func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 	if !sqliteDB.Migrator().HasTable("of_zone_domains") {
 		t.Error("Migrate() did not create of_zone_domains")
 	}
+	if !sqliteDB.Migrator().HasTable("of_redeem_codes") {
+		t.Error("Migrate() did not create of_redeem_codes")
+	}
+	channel := model.PaymentChannel{
+		Name: "test", Gateway: "https://pay.example.com", PID: "10001", SecretKey: "secret",
+	}
+	if err := sqliteDB.Create(&channel).Error; err != nil {
+		t.Fatalf("Migrate() create payment channel error = %v", err)
+	}
+	var loadedChannel model.PaymentChannel
+	if err := sqliteDB.First(&loadedChannel, channel.ID).Error; err != nil {
+		t.Fatalf("Migrate() load payment channel error = %v", err)
+	}
+	if loadedChannel.PID != channel.PID {
+		t.Fatalf("payment channel pid = %q, want %q", loadedChannel.PID, channel.PID)
+	}
 	if sqliteDB.Migrator().HasTable("of_managed_domains") {
 		t.Error("Migrate() should drop of_managed_domains after phase-2 cleanup")
 	}

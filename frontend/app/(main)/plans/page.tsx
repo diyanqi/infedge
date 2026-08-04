@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, CreditCard, Package, RefreshCw } from 'lucide-react';
+import { Check, CreditCard, Package, RefreshCw, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomService } from '@/lib/services/custom';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LoadingStateWithBorder } from '@/components/layout/loading';
 import { ErrorInline } from '@/components/layout/error';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -25,15 +26,14 @@ import {
 } from '@/components/ui/select';
 
 const formatBytes = (value: number) =>
-  value <= 0
-    ? '不限'
-    : (value / 1073741824).toFixed(value >= 1073741824 ? 0 : 1) + ' GB';
+  value <= 0 ? '不限' : (value / 1073741824).toFixed(2) + ' GB';
 const formatSpeed = (value: number) =>
-  value <= 0 ? '不额外限速' : (value / 1048576).toFixed(1) + ' MB/s';
+  value <= 0 ? '不额外限速' : (value / 1024).toFixed(1) + ' KB/s';
 
 export default function PlansPage() {
   const queryClient = useQueryClient();
   const [channelID, setChannelID] = useState('');
+  const [redeemCode, setRedeemCode] = useState('');
   const plans = useQuery({
     queryKey: ['custom', 'plans'],
     queryFn: () => CustomService.listPlans(),
@@ -67,6 +67,18 @@ export default function PlansPage() {
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : '购买失败'),
+  });
+  const redeem = useMutation({
+    mutationFn: (code: string) => CustomService.redeem(code),
+    onSuccess: async () => {
+      setRedeemCode('');
+      await queryClient.invalidateQueries({
+        queryKey: ['custom', 'subscription'],
+      });
+      toast.success('兑换成功，套餐已延长一个月');
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : '兑换失败'),
   });
 
   return (
@@ -117,6 +129,42 @@ export default function PlansPage() {
           </CardContent>
         </Card>
       )}
+      <Card>
+        <CardHeader className='pb-3'>
+          <CardTitle className='flex items-center gap-2 text-base'>
+            <Ticket className='size-4 text-primary' />
+            套餐兑换码
+          </CardTitle>
+          <CardDescription>
+            输入管理员提供的兑换码，可兑换对应套餐一个月。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className='flex flex-col gap-2 sm:flex-row'
+            onSubmit={(event) => {
+              event.preventDefault();
+              const code = redeemCode.trim();
+              if (code && !redeem.isPending) redeem.mutate(code);
+            }}
+          >
+            <Input
+              value={redeemCode}
+              onChange={(event) => setRedeemCode(event.target.value)}
+              placeholder='输入兑换码'
+              maxLength={64}
+              className='sm:max-w-sm'
+            />
+            <Button
+              type='submit'
+              disabled={!redeemCode.trim() || redeem.isPending}
+            >
+              <Ticket className='mr-2 size-4' />
+              {redeem.isPending ? '兑换中...' : '立即兑换'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
       {plans.isLoading ? (
         <LoadingStateWithBorder title='加载套餐' />
       ) : plans.isError ? (

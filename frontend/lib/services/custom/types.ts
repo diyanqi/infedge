@@ -40,6 +40,15 @@ export interface PaymentOrder {
   created_at: string;
   paid_at?: string | null;
 }
+export interface RedeemCode {
+  id: number;
+  code: string;
+  plan_id: number;
+  status: 'unused' | 'used';
+  used_by?: number | string | null;
+  used_at?: string | null;
+  plan?: SubscriptionPlan;
+}
 export interface ResourceZone {
   id: number;
   domain: string;
@@ -70,12 +79,6 @@ export interface ResourceRoute {
   upstream_list: string[];
   enabled: boolean;
   upstream_type: string;
-}
-export interface ResourceNodeGroup {
-  id: number;
-  name: string;
-  monthly_bytes_limit: number;
-  nodes: { id: number; node_id: string; name: string }[];
 }
 export interface PlanInput {
   name: string;
