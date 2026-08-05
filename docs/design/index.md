@@ -32,7 +32,7 @@ OpenFlare 适合需要统一管理多台 OpenResty 代理节点的团队，具�
 | **多节点监控与观测** | 访问日志为业务流量唯一真相；Agent 只上报明细与主机读数，Server 统一聚合；与 Zone/看板对账 | [观测数据传输模型](./observability-transport-model.md) / [边缘可观测与业务流量统计](./observability-design.md) / [上报协议与表结构](./observability-data-model.md) / [系统架构](./architecture.md) |
 | **用户套餐与资源隔离** | 普通用户按套餐管理自己的 Zone、域名、源站和 CDN 规则，购买额度并受发布次数和流量策略约束；管理员维护套餐、支付渠道和节点组 | [用户套餐、资源隔离与流量配额设计](./subscription-multitenancy.md) |
 | **普通用户域名控制台** | 普通用户按根域、子域和子域配置管理资源，支持 TXT 所有权验证、固定 CNAME 接入以及 owner-scoped TLS/WAF/Pages | [普通用户域名控制台设计](./ordinary-user-domain-console.md) |
-| **普通用户 CDN 控制台** | 普通用户首页提供站点、域名、源站和 Pages 概览，并通过接入进度与快速操作引导完成 CDN 配置 | [普通用户 CDN 控制台设计](./ordinary-user-dashboard.md) |
+| **普通用户 CDN 控制台** | 普通用户以服务总览进入网站安全加速和 Makers，并按网站列表、站点控制台和配置页分层完成 CDN 操作 | [普通用户 CDN 控制台设计](./ordinary-user-dashboard.md) |
 
 ---
 

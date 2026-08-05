@@ -15,6 +15,7 @@ import { ProjectListItem } from './components/project-list-item';
 import { projectsQueryKey } from './components/pages-utils';
 
 export default function PagesPage() {
+  const productName = 'Pages';
   const [editorOpen, setEditorOpen] = useState(false);
 
   const projectsQuery = useQuery({
@@ -28,10 +29,11 @@ export default function PagesPage() {
         <div className='flex items-center gap-2'>
           <FileText className='size-5 text-primary' />
           <div>
-            <h1 className='text-2xl font-semibold tracking-tight'>Pages</h1>
+            <h1 className='text-2xl font-semibold tracking-tight'>
+              {productName}
+            </h1>
             <p className='text-sm text-muted-foreground'>
-              边缘静态站点托管，上传静态资源部署包并在代理规则中选择 Pages
-              上游。
+              边缘静态站点托管，上传静态资源部署包并在网站配置中使用 上游。
             </p>
           </div>
         </div>
@@ -70,7 +72,7 @@ export default function PagesPage() {
           <LoadingStateWithBorder />
         ) : (projectsQuery.data ?? []).length === 0 ? (
           <EmptyStateWithBorder
-            title='还没有 Pages 项目'
+            title={`还没有 ${productName} 项目`}
             description='先创建一个项目，再上传静态资源部署包。'
           />
         ) : (

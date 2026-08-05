@@ -94,15 +94,20 @@ export const openflareSidebarNav: OpenFlareSidebarNavEntry[] = [
 ];
 
 export const ordinaryUserNav: OpenFlareNavItem[] = [
-  { title: '控制台', url: '/', icon: LayoutDashboard },
-  { title: '我的资源', url: '/resources', icon: Globe },
+  { title: '服务总览', url: '/', icon: LayoutDashboard },
+  {
+    title: '网站安全加速',
+    url: '/resources',
+    icon: Globe,
+    childUrls: ['/resources/detail', '/resources/configure'],
+  },
   {
     title: 'Pages',
     url: '/pages',
     icon: FileText,
     childUrls: ['/pages/detail'],
   },
-  { title: '套餐订阅', url: '/plans', icon: Package },
+  { title: '套餐与用量', url: '/plans', icon: Package },
 ];
 
 /** 扁平菜单项（供路由判断等逻辑复用） */
