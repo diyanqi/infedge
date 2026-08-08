@@ -194,11 +194,11 @@ function SystemConfigDetailPanel({
  *
  * @example
  * ```tsx
- * <SystemConfigs />
+ * <SystemConfigsContent />
  * ```
  * @returns {React.ReactNode} 系统配置管理组件
  */
-export function SystemConfigs() {
+function SystemConfigsContent() {
   const {
     systemConfigs: configs,
     systemConfigsLoading: loading,
@@ -326,7 +326,7 @@ export function SystemConfigs() {
 export default function SystemConfigPage() {
   return (
     <AdminProvider>
-      <SystemConfigs />
+      <SystemConfigsContent />
     </AdminProvider>
   );
 }
