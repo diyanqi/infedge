@@ -276,6 +276,13 @@ func loadProxyRouteZoneDomains(ctx context.Context, ids []uint) ([]model.ZoneDom
 	if err != nil {
 		return nil, errors.New(errProxyRouteZoneDomainNotFound)
 	}
+	for _, domain := range domains {
+		// Empty status is retained for legacy rows created before verification
+		// fields existed; newly onboarded rows use pending until TXT succeeds.
+		if domain.VerificationStatus != "" && domain.VerificationStatus != "verified" {
+			return nil, errors.New(errProxyRouteDomainUnverified)
+		}
+	}
 	return domains, nil
 }
 
@@ -442,6 +449,37 @@ func normalizeUpstreams(originURL string, upstreams []string) ([]string, error) 
 		return nil, errors.New(errProxyRouteUpstreamRequired)
 	}
 	return normalized, nil
+}
+
+func normalizeUpstreamWeights(count int, raw []int) ([]int, error) {
+	weights := make([]int, count)
+	for i := range weights {
+		weights[i] = 1
+	}
+	if len(raw) == 0 {
+		return weights, nil
+	}
+	if len(raw) != count {
+		return nil, errors.New("源站权重数量必须与源站数量一致")
+	}
+	for i, weight := range raw {
+		if weight < 1 || weight > 1000 {
+			return nil, errors.New("源站权重必须在 1 到 1000 之间")
+		}
+		weights[i] = weight
+	}
+	return weights, nil
+}
+
+func decodeStoredUpstreamWeights(raw string, count int) ([]int, error) {
+	if strings.TrimSpace(raw) == "" || strings.TrimSpace(raw) == "[]" {
+		return normalizeUpstreamWeights(count, nil)
+	}
+	var weights []int
+	if err := json.Unmarshal([]byte(raw), &weights); err != nil {
+		return nil, errors.New("upstream_weights payload is invalid")
+	}
+	return normalizeUpstreamWeights(count, weights)
 }
 
 func decodeStoredCustomHeaders(raw string) ([]CustomHeaderInput, error) {

@@ -43,6 +43,7 @@ const reverseProxySchema = z
   .object({
     upstream_type: z.enum(['direct', 'tunnel', 'pages']),
     origin_urls_text: z.string().trim(),
+    upstream_weights_text: z.string(),
     origin_host: z.string(),
     tunnel_id: z.string().optional(),
     tunnel_target_addr: z.string().trim().optional(),
@@ -66,6 +67,31 @@ const reverseProxySchema = z
             path: ['origin_urls_text'],
             message: error,
           });
+        } else if (value.upstream_weights_text.trim()) {
+          const weights = value.upstream_weights_text
+            .split(/\r?\n/)
+            .map((item) => Number(item.trim()));
+          if (
+            weights.some(
+              (weight) =>
+                !Number.isInteger(weight) || weight < 1 || weight > 1000,
+            )
+          ) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['upstream_weights_text'],
+              message: '源站权重必须是 1 到 1000 的整数',
+            });
+          } else if (
+            weights.length !==
+            parseOriginUrls(value.origin_urls_text).urls.length
+          ) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['upstream_weights_text'],
+              message: '权重数量必须与上游地址数量一致',
+            });
+          }
         }
       }
     } else if (value.upstream_type === 'tunnel') {
@@ -153,6 +179,7 @@ export function ProxySection({
     defaultValues: {
       upstream_type: route.upstream_type || 'direct',
       origin_urls_text: route.upstream_list.join('\n'),
+      upstream_weights_text: route.upstream_weight_list.join('\n'),
       origin_host: route.origin_host || '',
       tunnel_id: route.tunnel_node_id ? String(route.tunnel_node_id) : '',
       tunnel_target_addr: route.tunnel_target_addr || '',
@@ -169,6 +196,7 @@ export function ProxySection({
     form.reset({
       upstream_type: route.upstream_type || 'direct',
       origin_urls_text: route.upstream_list.join('\n'),
+      upstream_weights_text: route.upstream_weight_list.join('\n'),
       origin_host: route.origin_host || '',
       tunnel_id: route.tunnel_node_id ? String(route.tunnel_node_id) : '',
       tunnel_target_addr: route.tunnel_target_addr || '',
@@ -236,6 +264,11 @@ export function ProxySection({
                 origin_uri: originUri,
                 origin_host: values.origin_host.trim(),
                 upstreams,
+                upstream_weights: values.upstream_weights_text
+                  .split(/\r?\n/)
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+                  .map((item) => Number(item)),
                 custom_headers: headers,
                 upstream_type: values.upstream_type,
                 tunnel_node_id:
@@ -294,30 +327,53 @@ export function ProxySection({
           />
 
           {upstreamType === 'direct' ? (
-            <FormField
-              control={form.control}
-              name='origin_urls_text'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>上游地址</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      className='min-h-40 font-mono text-xs'
-                      placeholder={
-                        'https://origin-a.internal:443\nhttps://origin-b.internal:443'
-                      }
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    每行一个完整
-                    URL。第一行作为主回源，多上游模式请保持相同协议且不要包含
-                    path 或 query。
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className='grid gap-5 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='origin_urls_text'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>上游地址</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className='min-h-40 font-mono text-xs'
+                        placeholder={
+                          'https://origin-a.internal:443\nhttps://origin-b.internal:443'
+                        }
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      每行一个完整
+                      URL。第一行作为主回源，多源站请保持相同协议且不要包含 path
+                      或 query。
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='upstream_weights_text'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>源站权重</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className='min-h-40 font-mono text-xs'
+                        placeholder={'3\n1'}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      每行对应一个上游地址，第一行是主源站；留空时所有源站使用权重
+                      1。
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           ) : null}
 
           {upstreamType === 'tunnel' ? (

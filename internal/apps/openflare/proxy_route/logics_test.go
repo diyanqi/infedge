@@ -41,7 +41,12 @@ func createZoneDomain(t *testing.T, ctx context.Context, domain string, certID *
 	} else {
 		require.NoError(t, db.DB(ctx).Create(zone).Error)
 	}
-	item := &model.ZoneDomain{ZoneID: zone.ID, Domain: domain, CertID: certID}
+	item := &model.ZoneDomain{
+		ZoneID:             zone.ID,
+		Domain:             domain,
+		CertID:             certID,
+		VerificationStatus: "verified",
+	}
 	require.NoError(t, db.DB(ctx).Create(item).Error)
 	return item
 }
@@ -58,6 +63,68 @@ func TestCreateProxyRouteBindsZoneDomains(t *testing.T) {
 	assert.Equal(t, []uint{domainA.ID, domainB.ID}, view.ZoneDomainIDs)
 	require.Len(t, view.ZoneDomains, 2)
 	assert.Equal(t, "api.example.com", view.ZoneDomains[0].Domain)
+}
+
+func TestCreateProxyRouteRejectsUnverifiedZoneDomain(t *testing.T) {
+	cleanup := setupProxyRouteTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	domain := createZoneDomain(t, ctx, "pending.example.com", nil)
+	require.NoError(t, db.DB(ctx).Model(domain).Update("verification_status", "pending").Error)
+
+	_, err := CreateProxyRoute(ctx, Input{
+		SiteName:      "pending-site",
+		ZoneDomainIDs: []uint{domain.ID},
+		OriginURL:     "http://origin.example.com:8080",
+	})
+	require.EqualError(t, err, errProxyRouteDomainUnverified)
+}
+
+func TestCreateProxyRoutePersistsUpstreamWeights(t *testing.T) {
+	cleanup := setupProxyRouteTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	domain := createZoneDomain(t, ctx, "weighted.example.com", nil)
+
+	view, err := CreateProxyRoute(ctx, Input{
+		SiteName:        "weighted-site",
+		ZoneDomainIDs:   []uint{domain.ID},
+		OriginURL:       "http://primary.example.com:8080",
+		Upstreams:       []string{"http://backup.example.com:8080"},
+		UpstreamWeights: []int{3, 1},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []int{3, 1}, view.UpstreamWeightList)
+}
+
+func TestUpdateProxyRoutePersistsUpstreamWeights(t *testing.T) {
+	cleanup := setupProxyRouteTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	domain := createZoneDomain(t, ctx, "updated-weighted.example.com", nil)
+
+	created, err := CreateProxyRoute(ctx, Input{
+		SiteName:        "weighted-update-site",
+		ZoneDomainIDs:   []uint{domain.ID},
+		OriginURL:       "http://primary.example.com:8080",
+		Upstreams:       []string{"http://backup.example.com:8080"},
+		UpstreamWeights: []int{3, 1},
+	})
+	require.NoError(t, err)
+
+	updated, err := UpdateProxyRoute(ctx, created.ID, Input{
+		SiteName:        "weighted-update-site",
+		ZoneDomainIDs:   []uint{domain.ID},
+		OriginURL:       "http://primary.example.com:8080",
+		Upstreams:       []string{"http://backup.example.com:8080"},
+		UpstreamWeights: []int{7, 2},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []int{7, 2}, updated.UpstreamWeightList)
+
+	reloaded, err := GetProxyRoute(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []int{7, 2}, reloaded.UpstreamWeightList)
 }
 
 func TestCreateProxyRouteRejectsInvalidZoneDomainBindings(t *testing.T) {

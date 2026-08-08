@@ -145,8 +145,9 @@ func TestCoreChainMigrationFlow(t *testing.T) {
 		zone := model.Zone{Domain: "example.com"}
 		require.NoError(t, db.DB(context.Background()).Create(&zone).Error)
 		zoneDomain := model.ZoneDomain{
-			ZoneID: zone.ID,
-			Domain: "core-chain.example.com",
+			ZoneID:             zone.ID,
+			Domain:             "core-chain.example.com",
+			VerificationStatus: "verified",
 		}
 		require.NoError(t, db.DB(context.Background()).Create(&zoneDomain).Error)
 

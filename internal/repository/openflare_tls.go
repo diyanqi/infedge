@@ -9,6 +9,7 @@ import (
 
 	db "github.com/Rain-kl/Wavelet/internal/infra/persistence"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"gorm.io/gorm"
 )
 
 // HasTLSProxyRoutesTable 判断代理规则表是否已迁移。
@@ -78,6 +79,45 @@ func SaveTLSCertificate(ctx context.Context, certificate *model.TLSCertificate) 
 	return conn.Save(certificate).Error
 }
 
+// SaveOwnedTLSCertificate persists mutable certificate fields only when the
+// certificate still belongs to ownerID.
+func SaveOwnedTLSCertificate(ctx context.Context, certificate *model.TLSCertificate, ownerID uint64) error {
+	conn := db.DB(ctx)
+	if conn == nil {
+		return errors.New(errDatabaseNotInitialized)
+	}
+	result := conn.Model(&model.TLSCertificate{}).
+		Where("id = ? AND owner_id = ?", certificate.ID, ownerID).
+		Updates(map[string]any{
+			"name":            certificate.Name,
+			"cert_pem":        certificate.CertPEM,
+			"key_pem":         certificate.KeyPEM,
+			"not_before":      certificate.NotBefore,
+			"not_after":       certificate.NotAfter,
+			"remark":          certificate.Remark,
+			"provider":        certificate.Provider,
+			"acme_account_id": certificate.AcmeAccountID,
+			"dns_account_id":  certificate.DNSAccountID,
+			"key_algorithm":   certificate.KeyAlgorithm,
+			"auto_renew":      certificate.AutoRenew,
+			"primary_domain":  certificate.PrimaryDomain,
+			"other_domains":   certificate.OtherDomains,
+			"disable_cname":   certificate.DisableCNAME,
+			"skip_dns":        certificate.SkipDNS,
+			"dns1":            certificate.DNS1,
+			"dns2":            certificate.DNS2,
+			"apply_status":    certificate.ApplyStatus,
+			"apply_message":   certificate.ApplyMessage,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 // DeleteTLSCertificateRecord 删除证书记录。
 func DeleteTLSCertificateRecord(ctx context.Context, id uint) error {
 	conn := db.DB(ctx)
@@ -85,6 +125,22 @@ func DeleteTLSCertificateRecord(ctx context.Context, id uint) error {
 		return errors.New(errDatabaseNotInitialized)
 	}
 	return conn.Delete(&model.TLSCertificate{}, id).Error
+}
+
+// DeleteOwnedTLSCertificateRecord deletes a certificate only for its owner.
+func DeleteOwnedTLSCertificateRecord(ctx context.Context, id uint, ownerID uint64) error {
+	conn := db.DB(ctx)
+	if conn == nil {
+		return errors.New(errDatabaseNotInitialized)
+	}
+	result := conn.Where("id = ? AND owner_id = ?", id, ownerID).Delete(&model.TLSCertificate{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // CountTLSCertificatesByDNSAccountID 统计引用指定 DNS 账号的证书数量。

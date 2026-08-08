@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   useMutation,
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -56,16 +57,42 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function certificateCoversDomain(
+  certificate: { primary_domain?: string; other_domains?: string },
+  domain: string,
+) {
+  const names =
+    `${certificate.primary_domain ?? ''} ${certificate.other_domains ?? ''}`
+      .split(/[\s,;]+/)
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+  const normalized = domain.toLowerCase();
+  return names.some(
+    (name) =>
+      name === normalized ||
+      (name.startsWith('*.') && normalized.endsWith(name.slice(1))),
+  );
+}
+
 function routePayload(
   route: ResourceRoute | undefined,
   input: {
     siteName: string;
     domainId: number;
     originId: string;
+    originScheme: string;
+    originPort: string;
     enableHttps: boolean;
     redirectHttp: boolean;
     limitRate: string;
     limitReqPerIP: string;
+    upstreamsText: string;
+    upstreamWeightsText: string;
+    upstreamType: string;
+    pagesProjectId: string;
+    cacheEnabled: boolean;
+    cachePolicy: string;
+    cacheRulesText: string;
   },
 ) {
   return {
@@ -73,12 +100,21 @@ function routePayload(
     zone_domain_ids: [input.domainId],
     origin_id: input.originId ? Number(input.originId) : null,
     origin_url: route?.origin_url ?? '',
-    origin_scheme: 'http',
+    origin_scheme: input.originScheme,
     origin_address: '',
-    origin_port: '',
+    origin_port: input.originPort,
     origin_uri: '/',
     origin_host: route?.origin_host ?? '',
-    upstreams: route?.upstream_list ?? [],
+    upstreams: input.upstreamsText
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    upstream_weights: input.upstreamWeightsText
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item)),
     enabled: route?.enabled ?? true,
     enable_https: input.enableHttps,
     redirect_http: input.redirectHttp,
@@ -86,35 +122,49 @@ function routePayload(
     limit_conn_per_ip: route?.limit_conn_per_ip ?? 0,
     limit_rate: input.limitRate,
     limit_req_per_ip: input.limitReqPerIP,
-    cache_enabled: route?.cache_enabled ?? false,
-    cache_policy: route?.cache_policy ?? '',
-    cache_rules: [],
+    cache_enabled: input.cacheEnabled,
+    cache_policy: input.cachePolicy,
+    cache_rules: input.cacheRulesText
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean),
     custom_headers: [],
     basic_auth_enabled: route?.basic_auth_enabled ?? false,
     basic_auth_username: route?.basic_auth_username ?? '',
     basic_auth_password: '',
-    upstream_type: route?.upstream_type ?? 'direct',
-    pages_project_id: route?.pages_project_id ?? null,
+    upstream_type: input.upstreamType,
+    pages_project_id: input.pagesProjectId
+      ? Number(input.pagesProjectId)
+      : null,
   };
 }
 
 export default function ResourcesPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedRouteId = Number(searchParams.get('route'));
+  const requestedDomainId = Number(searchParams.get('domain'));
   const queryClient = useQueryClient();
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null);
   const [rootDomain, setRootDomain] = useState('');
-  const [claimsOwnership, setClaimsOwnership] = useState(false);
-  const [childDomain, setChildDomain] = useState('');
   const [childCertId, setChildCertId] = useState('');
   const [origin, setOrigin] = useState(emptyOrigin);
   const [siteName, setSiteName] = useState('');
   const [originId, setOriginId] = useState('');
+  const [originScheme, setOriginScheme] = useState('http');
+  const [originPort, setOriginPort] = useState('80');
   const [enableHttps, setEnableHttps] = useState(false);
   const [redirectHttp, setRedirectHttp] = useState(false);
   const [limitRate, setLimitRate] = useState('');
   const [limitReqPerIP, setLimitReqPerIP] = useState('');
+  const [upstreamsText, setUpstreamsText] = useState('');
+  const [upstreamWeightsText, setUpstreamWeightsText] = useState('');
+  const [upstreamType, setUpstreamType] = useState('direct');
+  const [pagesProjectId, setPagesProjectId] = useState('');
+  const [cacheEnabled, setCacheEnabled] = useState(false);
+  const [cachePolicy, setCachePolicy] = useState('static');
+  const [cacheRulesText, setCacheRulesText] = useState('');
   const [wafName, setWafName] = useState('');
   const [wafDraft, setWafDraft] = useState<number[]>([]);
 
@@ -133,6 +183,10 @@ export default function ResourcesPage() {
   const certificates = useQuery({
     queryKey: ['custom', 'certificates'],
     queryFn: () => CustomService.listCertificates(),
+  });
+  const pages = useQuery({
+    queryKey: ['custom', 'pages'],
+    queryFn: () => CustomService.listPages(),
   });
   const policies = useQuery({
     queryKey: ['custom', 'policies'],
@@ -165,6 +219,8 @@ export default function ResourcesPage() {
   const selectedDomain = selectedDomains.find(
     (domain) => domain.id === selectedDomainId,
   );
+  const selectedDomainVerified =
+    selectedDomain?.verification_status === 'verified';
   const selectedRoute = routes.data?.find((route) =>
     route.zone_domain_ids.includes(selectedDomainId ?? -1),
   );
@@ -183,9 +239,13 @@ export default function ResourcesPage() {
     const requestedRoute = routes.data?.find(
       (route) => route.id === requestedRouteId,
     );
-    const requestedDomainId = requestedRoute?.zone_domain_ids[0];
+    const requestedRouteDomainId = requestedRoute?.zone_domain_ids[0];
+    const targetDomainId =
+      Number.isFinite(requestedDomainId) && requestedDomainId > 0
+        ? requestedDomainId
+        : requestedRouteDomainId;
     const requestedZone = Object.entries(domains).find(([, zoneDomains]) =>
-      zoneDomains.some((domain) => domain.id === requestedDomainId),
+      zoneDomains.some((domain) => domain.id === targetDomainId),
     )?.[0];
     const requestedZoneId = Number(requestedZone);
     const zone =
@@ -194,11 +254,19 @@ export default function ResourcesPage() {
       zones.data[0];
     if (zone.id !== selectedZoneId) setSelectedZoneId(zone.id);
     const zoneDomains = domains[zone.id] ?? [];
-    if (!zoneDomains.some((item) => item.id === selectedDomainId)) {
+    const requestedDomain = zoneDomains.find(
+      (item) => item.id === targetDomainId,
+    );
+    if (requestedDomain) {
+      if (requestedDomain.id !== selectedDomainId) {
+        setSelectedDomainId(requestedDomain.id);
+      }
+    } else if (!zoneDomains.some((item) => item.id === selectedDomainId)) {
       setSelectedDomainId(zoneDomains[0]?.id ?? null);
     }
   }, [
     domains,
+    requestedDomainId,
     requestedRouteId,
     routes.data,
     selectedDomainId,
@@ -211,10 +279,33 @@ export default function ResourcesPage() {
     setOriginId(
       selectedRoute?.origin_id ? String(selectedRoute.origin_id) : '',
     );
+    const originURL = selectedRoute?.origin_url ?? '';
+    try {
+      const parsed = new URL(originURL);
+      const scheme = parsed.protocol === 'https:' ? 'https' : 'http';
+      setOriginScheme(scheme);
+      setOriginPort(parsed.port || (scheme === 'https' ? '443' : '80'));
+    } catch {
+      setOriginScheme('http');
+      setOriginPort('80');
+    }
     setEnableHttps(selectedRoute?.enable_https ?? false);
     setRedirectHttp(selectedRoute?.redirect_http ?? false);
     setLimitRate(selectedRoute?.limit_rate ?? '');
     setLimitReqPerIP(selectedRoute?.limit_req_per_ip ?? '');
+    setUpstreamsText(selectedRoute?.upstream_list?.slice(1).join('\n') ?? '');
+    setUpstreamWeightsText(
+      selectedRoute?.upstream_weight_list?.join('\n') ?? '',
+    );
+    setUpstreamType(selectedRoute?.upstream_type ?? 'direct');
+    setPagesProjectId(
+      selectedRoute?.pages_project_id
+        ? String(selectedRoute.pages_project_id)
+        : '',
+    );
+    setCacheEnabled(selectedRoute?.cache_enabled ?? false);
+    setCachePolicy(selectedRoute?.cache_policy ?? 'static');
+    setCacheRulesText(selectedRoute?.cache_rule_list?.join('\n') ?? '');
   }, [selectedRoute]);
 
   useEffect(() => {
@@ -238,35 +329,26 @@ export default function ResourcesPage() {
   };
 
   const createZone = useMutation({
-    mutationFn: () => CustomService.createZone(rootDomain, claimsOwnership),
-    onSuccess: () => {
+    mutationFn: () => CustomService.createSite(rootDomain),
+    onSuccess: (site) => {
       setRootDomain('');
-      setClaimsOwnership(false);
       refresh();
-      toast.success('根域已创建，请按提示完成 DNS TXT 验证');
+      router.replace(`/resources/configure?domain=${site.domain.id}`);
+      toast.success('域名已添加，请按提示完成 DNS TXT 验证');
     },
-    onError: (error) => toast.error(errorMessage(error, '创建根域失败')),
-  });
-  const createDomain = useMutation({
-    mutationFn: () =>
-      CustomService.createDomain(
-        selectedZone!.id,
-        childDomain,
-        childCertId ? Number(childCertId) : null,
-      ),
-    onSuccess: () => {
-      setChildDomain('');
-      setChildCertId('');
-      refresh();
-      toast.success('子域已添加');
-    },
-    onError: (error) => toast.error(errorMessage(error, '添加子域失败')),
+    onError: (error) => toast.error(errorMessage(error, '添加域名失败')),
   });
   const updateDomain = useMutation({
-    mutationFn: (domain: ResourceDomain) =>
+    mutationFn: ({
+      domain,
+      certId,
+    }: {
+      domain: ResourceDomain;
+      certId: number | null;
+    }) =>
       CustomService.updateDomain(selectedZone!.id, domain.id, {
         domain: domain.domain,
-        cert_id: childCertId ? Number(childCertId) : null,
+        cert_id: certId,
       }),
     onSuccess: () => {
       refresh();
@@ -285,7 +367,7 @@ export default function ResourcesPage() {
   });
   const saveRoute = useMutation({
     mutationFn: () => {
-      if (!selectedDomain) throw new Error('请先选择子域');
+      if (!selectedDomain) throw new Error('请先选择域名');
       return selectedRoute
         ? CustomService.updateRoute(
             selectedRoute.id,
@@ -293,10 +375,19 @@ export default function ResourcesPage() {
               siteName,
               domainId: selectedDomain.id,
               originId,
+              originScheme,
+              originPort,
               enableHttps,
               redirectHttp,
               limitRate,
               limitReqPerIP,
+              upstreamsText,
+              upstreamWeightsText,
+              upstreamType,
+              pagesProjectId,
+              cacheEnabled,
+              cachePolicy,
+              cacheRulesText,
             }),
           )
         : CustomService.createRoute(
@@ -304,44 +395,44 @@ export default function ResourcesPage() {
               siteName,
               domainId: selectedDomain.id,
               originId,
+              originScheme,
+              originPort,
               enableHttps,
               redirectHttp,
               limitRate,
               limitReqPerIP,
+              upstreamsText,
+              upstreamWeightsText,
+              upstreamType,
+              pagesProjectId,
+              cacheEnabled,
+              cachePolicy,
+              cacheRulesText,
             }),
           );
     },
     onSuccess: () => {
       refresh();
-      toast.success('子域配置已保存');
+      toast.success('域名配置已保存');
     },
-    onError: (error) => toast.error(errorMessage(error, '保存子域配置失败')),
+    onError: (error) => toast.error(errorMessage(error, '保存域名配置失败')),
   });
   const publish = useMutation({
     mutationFn: () => CustomService.publish(),
     onSuccess: (data) => toast.success(`已部署版本 ${data.version}`),
     onError: (error) => toast.error(errorMessage(error, '部署失败')),
   });
-  const verifyZone = useMutation({
-    mutationFn: (id: number) => CustomService.verifyZone(id),
-    onSuccess: () => {
-      refresh();
-      toast.success('根域验证成功，子域可继承验证状态');
-    },
-    onError: (error) => toast.error(errorMessage(error, '根域验证失败')),
-  });
   const verifyDomain = useMutation({
-    mutationFn: ({ zoneId, domainId }: { zoneId: number; domainId: number }) =>
-      CustomService.verifyDomain(zoneId, domainId),
+    mutationFn: (domainId: number) => CustomService.verifySite(domainId),
     onSuccess: () => {
       refresh();
-      toast.success('子域验证成功');
+      toast.success('域名验证成功');
     },
-    onError: (error) => toast.error(errorMessage(error, '子域验证失败')),
+    onError: (error) => toast.error(errorMessage(error, '域名验证失败')),
   });
   const createWaf = useMutation({
     mutationFn: () => {
-      if (!selectedDomain) throw new Error('请先选择子域');
+      if (!selectedDomain) throw new Error('请先选择域名');
       return CustomService.createWafRule({
         name: wafName,
         host: selectedDomain.domain,
@@ -356,7 +447,7 @@ export default function ResourcesPage() {
   });
   const saveWaf = useMutation({
     mutationFn: () => {
-      if (!selectedRoute) throw new Error('请先保存子域配置');
+      if (!selectedRoute) throw new Error('请先保存域名配置');
       return CustomService.updateRouteWaf(selectedRoute.id, wafDraft);
     },
     onSuccess: () => {
@@ -403,7 +494,7 @@ export default function ResourcesPage() {
         <ShieldAlert />
         <AlertTitle>域名接入要求</AlertTitle>
         <AlertDescription>
-          所有子域必须将 CNAME 指向 <strong>cname.edge.infvar.com</strong>
+          所有接入域名必须将 CNAME 指向 <strong>cname.edge.infvar.com</strong>
           。禁止自行优选 IP，发现后将封号且不可申诉；该 CNAME
           已每小时进行全国拨测优选。
         </AlertDescription>
@@ -411,34 +502,27 @@ export default function ResourcesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className='text-base'>添加根域</CardTitle>
+          <CardTitle className='text-base'>添加 CDN 域名</CardTitle>
           <CardDescription>
-            根域是资源隔离和所有权验证的第一级。
+            输入根域或子域即可创建站点，系统会自动完成后台归组。
           </CardDescription>
         </CardHeader>
         <CardContent className='flex flex-col gap-3 lg:flex-row lg:items-end'>
           <div className='flex-1 flex flex-col gap-2'>
-            <Label htmlFor='root-domain'>根域</Label>
+            <Label htmlFor='root-domain'>域名</Label>
             <Input
               id='root-domain'
               value={rootDomain}
               onChange={(event) => setRootDomain(event.target.value)}
-              placeholder='example.com'
+              placeholder='example.com 或 www.example.com'
             />
           </div>
-          <label className='flex items-center gap-2 pb-2 text-sm text-muted-foreground'>
-            <Checkbox
-              checked={claimsOwnership}
-              onCheckedChange={(value) => setClaimsOwnership(value === true)}
-            />
-            我拥有根域全部所有权，子域可继承验证
-          </label>
           <Button
             onClick={() => createZone.mutate()}
             disabled={!rootDomain || createZone.isPending}
           >
             <Plus data-icon='inline-start' />
-            创建根域
+            添加域名
           </Button>
         </CardContent>
       </Card>
@@ -446,7 +530,7 @@ export default function ResourcesPage() {
       <div className='grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]'>
         <Card className='h-fit'>
           <CardHeader className='pb-3'>
-            <CardTitle className='text-base'>根域</CardTitle>
+            <CardTitle className='text-base'>域名分组</CardTitle>
           </CardHeader>
           <CardContent className='flex flex-col gap-1'>
             {(zones.data ?? []).map((zone) => (
@@ -465,7 +549,7 @@ export default function ResourcesPage() {
             ))}
             {!zones.data?.length && (
               <p className='px-2 py-4 text-sm text-muted-foreground'>
-                暂无根域
+                暂无域名
               </p>
             )}
           </CardContent>
@@ -480,29 +564,15 @@ export default function ResourcesPage() {
                     {selectedZone.domain}
                   </CardTitle>
                   <CardDescription>
-                    先选择子域，再进入该子域的配置。
+                    先选择域名，再进入该域名的 CDN 配置。
                   </CardDescription>
                 </div>
                 <div className='flex items-center gap-2'>
-                  {selectedZone.verification_status === 'verified' ? (
-                    <Badge variant='secondary'>
-                      <CheckCircle2 data-icon='inline-start' />
-                      已验证
-                    </Badge>
-                  ) : (
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      onClick={() => verifyZone.mutate(selectedZone.id)}
-                    >
-                      验证根域
-                    </Button>
-                  )}
                   <Button
                     variant='ghost'
                     size='icon'
                     onClick={() => remove('zone', selectedZone.id)}
-                    aria-label='删除根域'
+                    aria-label='删除域名分组'
                   >
                     <Trash2 />
                   </Button>
@@ -535,52 +605,18 @@ export default function ResourcesPage() {
                     </Button>
                   ))}
                 </div>
-                <div className='flex flex-col gap-3 border-t pt-4'>
-                  <div className='flex items-center gap-2 text-sm font-medium'>
-                    <Link2 /> 添加子域
-                  </div>
-                  <div className='grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,220px)_auto]'>
-                    <Input
-                      value={childDomain}
-                      onChange={(event) => setChildDomain(event.target.value)}
-                      placeholder='www.example.com'
-                    />
-                    <Select value={childCertId} onValueChange={setChildCertId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder='选择 HTTPS 证书（可选）' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(certificates.data ?? []).map((certificate) => (
-                          <SelectItem
-                            key={certificate.id}
-                            value={String(certificate.id)}
-                          >
-                            {certificate.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      onClick={() => createDomain.mutate()}
-                      disabled={!childDomain || createDomain.isPending}
-                    >
-                      <Plus data-icon='inline-start' />
-                      添加
-                    </Button>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardContent className='py-12 text-center text-sm text-muted-foreground'>
-                创建根域后，从左侧选择一个根域。
+                添加域名后，从左侧选择一个域名分组。
               </CardContent>
             </Card>
           )}
 
           {selectedDomain && (
-            <div className='flex flex-col gap-6'>
+            <>
               <Card>
                 <CardHeader>
                   <div className='flex flex-wrap items-start justify-between gap-3'>
@@ -589,7 +625,7 @@ export default function ResourcesPage() {
                         {selectedDomain.domain}
                       </CardTitle>
                       <CardDescription>
-                        子域配置只作用于当前 Host，不会影响其他子域。
+                        配置只作用于当前域名，不会影响同一分组中的其他域名。
                       </CardDescription>
                     </div>
                     <div className='flex items-center gap-2'>
@@ -598,21 +634,15 @@ export default function ResourcesPage() {
                           ? 'TXT 已验证'
                           : '待 TXT 验证'}
                       </Badge>
-                      {selectedDomain.verification_status !== 'verified' &&
-                        !selectedZone?.claims_ownership && (
-                          <Button
-                            size='sm'
-                            variant='outline'
-                            onClick={() =>
-                              verifyDomain.mutate({
-                                zoneId: selectedZone!.id,
-                                domainId: selectedDomain.id,
-                              })
-                            }
-                          >
-                            验证子域
-                          </Button>
-                        )}
+                      {selectedDomain.verification_status !== 'verified' && (
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={() => verifyDomain.mutate(selectedDomain.id)}
+                        >
+                          验证域名
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -625,6 +655,35 @@ export default function ResourcesPage() {
                       <strong>cname.edge.infvar.com</strong> 后再部署。
                     </AlertDescription>
                   </Alert>
+                  {selectedDomain.verification_status !== 'verified' &&
+                  selectedDomain.verification_token ? (
+                    <Alert>
+                      <ShieldAlert />
+                      <AlertTitle>完成域名所有权验证</AlertTitle>
+                      <AlertDescription className='space-y-2'>
+                        <p>
+                          请在 DNS 服务商创建 TXT 记录，名称为{' '}
+                          <code>
+                            _openflare-verification.{selectedDomain.domain}
+                          </code>
+                          ， 值为：
+                        </p>
+                        <code className='block break-all rounded bg-muted px-2 py-1 text-xs'>
+                          {selectedDomain.verification_token}
+                        </code>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                  {selectedDomain.verification_status !== 'verified' ? (
+                    <Alert>
+                      <ShieldAlert />
+                      <AlertTitle>验证后解锁 CDN 配置</AlertTitle>
+                      <AlertDescription>
+                        完成上方 TXT 所有权验证后，才能保存源站、HTTPS、缓存和
+                        WAF 配置。
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                   <div className='grid gap-4 md:grid-cols-2'>
                     <div className='flex flex-col gap-2'>
                       <Label>源站</Label>
@@ -640,13 +699,55 @@ export default function ResourcesPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <div className='grid grid-cols-2 gap-2'>
+                        <Select
+                          value={originScheme}
+                          onValueChange={setOriginScheme}
+                        >
+                          <SelectTrigger aria-label='源站协议'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='http'>HTTP</SelectItem>
+                            <SelectItem value='https'>HTTPS</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={originPort}
+                          onChange={(event) =>
+                            setOriginPort(event.target.value)
+                          }
+                          placeholder='端口'
+                          aria-label='源站端口'
+                        />
+                      </div>
                     </div>
                     <div className='flex flex-col gap-2'>
                       <Label>HTTPS 与 TLS 证书</Label>
                       <div className='flex items-center gap-3'>
                         <Switch
                           checked={enableHttps}
-                          onCheckedChange={setEnableHttps}
+                          onCheckedChange={(enabled) => {
+                            setEnableHttps(enabled);
+                            if (!enabled || selectedDomain.cert_id) return;
+                            const certificate = (certificates.data ?? []).find(
+                              (item) =>
+                                certificateCoversDomain(
+                                  item,
+                                  selectedDomain.domain,
+                                ),
+                            );
+                            if (certificate) {
+                              setChildCertId(String(certificate.id));
+                              updateDomain.mutate({
+                                domain: selectedDomain,
+                                certId: certificate.id,
+                              });
+                              toast.success(
+                                `已自动选择证书：${certificate.name}`,
+                              );
+                            }
+                          }}
                           aria-label='启用 HTTPS'
                         />
                         <span className='text-sm'>
@@ -682,13 +783,125 @@ export default function ResourcesPage() {
                       <Button
                         variant='outline'
                         size='sm'
-                        onClick={() => updateDomain.mutate(selectedDomain)}
-                        disabled={updateDomain.isPending || !childCertId}
+                        onClick={() =>
+                          updateDomain.mutate({
+                            domain: selectedDomain,
+                            certId: childCertId ? Number(childCertId) : null,
+                          })
+                        }
+                        disabled={
+                          !selectedDomainVerified ||
+                          updateDomain.isPending ||
+                          !childCertId
+                        }
                       >
                         <LockKeyhole data-icon='inline-start' />
                         保存证书
                       </Button>
                     </div>
+                  </div>
+                  <div className='grid gap-4 border-t pt-4 md:grid-cols-2'>
+                    <div className='flex flex-col gap-2'>
+                      <Label>源站类型</Label>
+                      <Select
+                        value={upstreamType}
+                        onValueChange={setUpstreamType}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='direct'>直连源站</SelectItem>
+                          <SelectItem value='pages'>Pages 项目</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {upstreamType === 'pages' ? (
+                        <Select
+                          value={pagesProjectId}
+                          onValueChange={setPagesProjectId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder='选择 Pages 项目' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(pages.data ?? []).map((project) => (
+                              <SelectItem
+                                key={project.id}
+                                value={String(project.id)}
+                              >
+                                {project.name} · {project.slug}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : null}
+                    </div>
+                    {upstreamType === 'direct' ? (
+                      <div className='flex flex-col gap-2'>
+                        <Label htmlFor='upstreams'>备用源站地址</Label>
+                        <Textarea
+                          id='upstreams'
+                          value={upstreamsText}
+                          onChange={(event) =>
+                            setUpstreamsText(event.target.value)
+                          }
+                          placeholder='每行一个 http(s)://host:port 地址'
+                          rows={3}
+                        />
+                        <Label htmlFor='upstream-weights'>源站权重</Label>
+                        <Textarea
+                          id='upstream-weights'
+                          value={upstreamWeightsText}
+                          onChange={(event) =>
+                            setUpstreamWeightsText(event.target.value)
+                          }
+                          placeholder='每行一个权重，第一行是主源站，例如 3、1'
+                          rows={2}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className='grid gap-4 border-t pt-4 md:grid-cols-2'>
+                    <div className='flex items-center gap-3'>
+                      <Switch
+                        checked={cacheEnabled}
+                        onCheckedChange={setCacheEnabled}
+                        aria-label='启用边缘缓存'
+                      />
+                      <Label>边缘缓存</Label>
+                      {cacheEnabled ? (
+                        <Select
+                          value={cachePolicy}
+                          onValueChange={setCachePolicy}
+                        >
+                          <SelectTrigger className='w-44'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='static'>标准静态资源</SelectItem>
+                            <SelectItem value='all'>所有可缓存 GET</SelectItem>
+                            <SelectItem value='suffix'>指定后缀</SelectItem>
+                            <SelectItem value='path_prefix'>
+                              路径前缀
+                            </SelectItem>
+                            <SelectItem value='path_exact'>精确路径</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : null}
+                    </div>
+                    {cacheEnabled &&
+                    cachePolicy !== 'static' &&
+                    cachePolicy !== 'all' ? (
+                      <Textarea
+                        value={cacheRulesText}
+                        onChange={(event) =>
+                          setCacheRulesText(event.target.value)
+                        }
+                        placeholder='每行一条缓存规则'
+                        rows={2}
+                        aria-label='缓存规则'
+                      />
+                    ) : null}
                   </div>
                   <div className='grid gap-3 md:grid-cols-2'>
                     <div className='flex flex-col gap-2'>
@@ -740,10 +953,15 @@ export default function ResourcesPage() {
                   </div>
                   <Button
                     onClick={() => saveRoute.mutate()}
-                    disabled={!siteName || !originId || saveRoute.isPending}
+                    disabled={
+                      !selectedDomainVerified ||
+                      !siteName ||
+                      (upstreamType === 'direct' && !originId) ||
+                      saveRoute.isPending
+                    }
                   >
                     <Settings2 data-icon='inline-start' />
-                    {selectedRoute ? '保存子域配置' : '创建并保存子域配置'}
+                    {selectedRoute ? '保存域名配置' : '创建并保存域名配置'}
                   </Button>
                 </CardContent>
               </Card>
@@ -754,7 +972,7 @@ export default function ResourcesPage() {
                     <div className='flex flex-col gap-1'>
                       <CardTitle className='text-base'>防火墙</CardTitle>
                       <CardDescription>
-                        规则仅绑定当前子域；全局规则始终优先且只读。
+                        规则仅绑定当前域名；全局规则始终优先且只读。
                       </CardDescription>
                     </div>
                     <ShieldCheck className='size-5 text-primary' />
@@ -762,7 +980,7 @@ export default function ResourcesPage() {
                 </CardHeader>
                 <CardContent className='flex flex-col gap-5'>
                   <div className='flex flex-col gap-2'>
-                    <Label htmlFor='waf-name'>创建当前子域规则</Label>
+                    <Label htmlFor='waf-name'>创建当前域名规则</Label>
                     <div className='flex gap-2'>
                       <Input
                         id='waf-name'
@@ -772,7 +990,11 @@ export default function ResourcesPage() {
                       />
                       <Button
                         onClick={() => createWaf.mutate()}
-                        disabled={!wafName || createWaf.isPending}
+                        disabled={
+                          !selectedDomainVerified ||
+                          !wafName ||
+                          createWaf.isPending
+                        }
                       >
                         <Plus data-icon='inline-start' />
                         创建规则
@@ -817,7 +1039,7 @@ export default function ResourcesPage() {
                               }
                             >
                               {rule.host === selectedDomain.domain
-                                ? '匹配当前子域'
+                                ? '匹配当前域名'
                                 : '其他 Host'}
                             </Badge>
                           </label>
@@ -825,7 +1047,7 @@ export default function ResourcesPage() {
                       <Button
                         variant='outline'
                         onClick={() => saveWaf.mutate()}
-                        disabled={saveWaf.isPending}
+                        disabled={!selectedDomainVerified || saveWaf.isPending}
                       >
                         保存防火墙绑定
                       </Button>
@@ -855,7 +1077,7 @@ export default function ResourcesPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -863,7 +1085,7 @@ export default function ResourcesPage() {
       <Card>
         <CardHeader>
           <CardTitle className='text-base'>源站资源</CardTitle>
-          <CardDescription>源站可被自己的多个子域配置复用。</CardDescription>
+          <CardDescription>源站可被自己的多个域名配置复用。</CardDescription>
         </CardHeader>
         <CardContent className='flex flex-col gap-4'>
           <div className='grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]'>

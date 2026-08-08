@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import type { TlsCertificateApi } from '@/lib/services/custom';
 import type { TlsCertificateItem } from '@/lib/services/openflare';
 import { TlsCertificateService } from '@/lib/services/openflare';
 
@@ -40,12 +41,14 @@ interface CertificateImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported?: (certificate: TlsCertificateItem) => void;
+  certificateService?: TlsCertificateApi;
 }
 
 export function CertificateImportDialog({
   open,
   onOpenChange,
   onImported,
+  certificateService = TlsCertificateService,
 }: CertificateImportDialogProps) {
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<'manual' | 'file'>('manual');
@@ -94,7 +97,7 @@ export function CertificateImportDialog({
 
   const manualImportMutation = useMutation({
     mutationFn: (values: ManualImportFormValues) =>
-      TlsCertificateService.create(toManualPayload(values)),
+      certificateService.create(toManualPayload(values)),
     onSuccess: async (certificate) => {
       await invalidateQueries();
       onImported?.(certificate);
@@ -105,9 +108,7 @@ export function CertificateImportDialog({
 
   const fileImportMutation = useMutation({
     mutationFn: (values: FileImportFormValues) =>
-      TlsCertificateService.importFile(
-        toFilePayload(values, certFile, keyFile),
-      ),
+      certificateService.importFile(toFilePayload(values, certFile, keyFile)),
     onSuccess: async (certificate) => {
       await invalidateQueries();
       onImported?.(certificate);

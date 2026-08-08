@@ -10,6 +10,10 @@ import (
 )
 
 func registerZoneRoutes(apiGroup *gin.RouterGroup) {
+	siteGroup := apiGroup.Group("/sites")
+	siteGroup.Use(apiutil.AdminMiddlewares()...)
+	siteGroup.POST("", zone.CreateSiteHandler)
+	siteGroup.POST("/:id/verify", zone.VerifySiteDomainHandler)
 	zoneGroup := apiGroup.Group("/zones")
 	zoneGroup.Use(apiutil.AdminMiddlewares()...)
 	apiutil.RegisterCollection(zoneGroup, "GET", zone.ListHandler)

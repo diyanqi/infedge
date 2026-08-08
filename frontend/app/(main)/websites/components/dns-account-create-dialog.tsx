@@ -123,15 +123,18 @@ export function DnsAccountCreateDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='cloudflare'>Cloudflare</SelectItem>
+                <SelectItem value='aliyun'>阿里云 DNS</SelectItem>
+                <SelectItem value='tencent'>腾讯云 DNSPod</SelectItem>
+                <SelectItem value='huawei'>华为云 DNS</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className='space-y-2'>
-            <Label>API Token</Label>
+            <Label>访问凭据 JSON 或 Token</Label>
             <Input
               {...form.register('authorization')}
-              placeholder='请勿使用 Global API Key'
+              placeholder='Cloudflare 可填 Token；其他厂商请填 JSON 凭据'
             />
             {form.formState.errors.authorization ? (
               <p className='text-xs text-destructive'>

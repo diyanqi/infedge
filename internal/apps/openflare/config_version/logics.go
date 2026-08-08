@@ -392,6 +392,7 @@ func normalizeSnapshotRoutes(routes []snapshotRoute) []snapshotRoute {
 		if upstreamErr == nil {
 			routes[index].OriginURL = normalizedUpstreams[0]
 			routes[index].Upstreams = normalizedUpstreams
+			routes[index].UpstreamWeights = normalizeSnapshotUpstreamWeights(routes[index].UpstreamWeights, len(normalizedUpstreams))
 		}
 		if !routes[index].BasicAuthEnabled {
 			routes[index].BasicAuthUsername = ""
@@ -407,6 +408,17 @@ func normalizeSnapshotRoutes(routes []snapshotRoute) []snapshotRoute {
 		}
 	}
 	return routes
+}
+
+func normalizeSnapshotUpstreamWeights(raw []int, count int) []int {
+	if len(raw) == count {
+		return raw
+	}
+	weights := make([]int, count)
+	for i := range weights {
+		weights[i] = 1
+	}
+	return weights
 }
 
 // normalizeSnapshotCachePolicy aligns published policy with edge-cache-design:
@@ -450,6 +462,7 @@ func snapshotRouteConfigEqual(left snapshotRoute, right snapshotRoute) bool {
 	return snapshotRouteScalarsEqual(left, right) &&
 		slices.Equal(left.Domains, right.Domains) &&
 		slices.Equal(left.Upstreams, right.Upstreams) &&
+		slices.Equal(left.UpstreamWeights, right.UpstreamWeights) &&
 		slices.Equal(left.CacheRules, right.CacheRules) &&
 		slices.Equal(left.CustomHeaders, right.CustomHeaders)
 }

@@ -234,6 +234,7 @@ export interface ProxyRouteItem {
   origin_host: string;
   upstreams: string;
   upstream_list: string[];
+  upstream_weight_list: number[];
   enabled: boolean;
   enable_https: boolean;
   redirect_http: boolean;
@@ -271,6 +272,7 @@ export interface ProxyRouteMutationPayload {
   origin_uri: string;
   origin_host: string;
   upstreams: string[];
+  upstream_weights?: number[];
   enabled: boolean;
   enable_https: boolean;
   redirect_http: boolean;
@@ -1306,12 +1308,23 @@ export interface ZoneMutationPayload {
   domain: string;
 }
 
+export interface SiteMutationPayload {
+  domain: string;
+}
+
+export interface SiteItem {
+  zone: ZoneItem;
+  domain: ZoneDomainItem;
+}
+
 export interface ZoneDomainItem {
   id: number;
   zone_id: number;
   proxy_route_id: number | null;
   domain: string;
   cert_id: number | null;
+  verification_status?: string;
+  verification_token?: string;
   created_at: string;
   updated_at: string;
 }

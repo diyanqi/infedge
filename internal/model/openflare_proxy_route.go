@@ -17,6 +17,7 @@ type ProxyRoute struct {
 	OriginURL            string       `json:"origin_url" gorm:"size:2048;not null"`
 	OriginHost           string       `json:"origin_host" gorm:"size:255"`
 	Upstreams            string       `json:"upstreams" gorm:"type:text;not null;default:'[]'"`
+	UpstreamWeights      string       `json:"upstream_weights" gorm:"type:text;not null;default:'[]'"`
 	Enabled              bool         `json:"enabled" gorm:"not null;default:true"`
 	EnableHTTPS          bool         `json:"enable_https" gorm:"column:enable_https;not null;default:false"`
 	RedirectHTTP         bool         `json:"redirect_http" gorm:"not null;default:false"`

@@ -35,6 +35,39 @@ func TestCreateZoneDomainRejectsWildcard(t *testing.T) {
 	require.EqualError(t, err, errDomainWildcardUnsupported)
 }
 
+func TestCreateSiteAcceptsRootOrSubdomain(t *testing.T) {
+	ctx := setupZoneDB(t)
+
+	first, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "www.Example.com"})
+	require.NoError(t, err)
+	require.Equal(t, "example.com", first.Zone.Domain)
+	require.Equal(t, "www.example.com", first.Domain.Domain)
+	require.Equal(t, uint64(42), first.Zone.OwnerID)
+
+	second, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "example.com"})
+	require.NoError(t, err)
+	require.Equal(t, first.Zone.ID, second.Zone.ID)
+	require.Equal(t, "example.com", second.Domain.Domain)
+}
+
+func TestCreateSiteRequiresExplicitDomain(t *testing.T) {
+	ctx := setupZoneDB(t)
+	_, err := CreateOwnedSite(ctx, 42, SiteInput{})
+	require.EqualError(t, err, errSiteDomainRequired)
+}
+
+func TestCreateSiteRequiresDomainVerificationForClaimedZone(t *testing.T) {
+	ctx := setupZoneDB(t)
+	zone, err := Create(ctx, Input{Domain: "example.com", ClaimsOwnership: true})
+	require.NoError(t, err)
+	zone.VerificationStatus = zoneVerificationStatusVerified
+	require.NoError(t, db.DB(ctx).Save(zone).Error)
+
+	site, err := CreateOwnedSite(ctx, 0, SiteInput{Domain: "www.example.com"})
+	require.NoError(t, err)
+	require.Equal(t, "pending", site.Domain.VerificationStatus)
+}
+
 func TestDeleteDomainRejectsBoundRoute(t *testing.T) {
 	ctx := setupZoneDB(t)
 	zone, err := Create(ctx, Input{Domain: "example.com"})

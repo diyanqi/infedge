@@ -21,6 +21,7 @@ import { LoadingStateWithBorder } from '@/components/layout/loading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import type { TlsCertificateApi } from '@/lib/services/custom';
 import type { TlsCertificateItem } from '@/lib/services/openflare';
 import { TlsCertificateService } from '@/lib/services/openflare';
 
@@ -39,6 +40,7 @@ interface CertificateEditorDialogProps {
   onOpenChange: (open: boolean) => void;
   onSaved?: (certificate: TlsCertificateItem) => void;
   onConvert?: (certificate: TlsCertificateItem) => void;
+  certificateService?: TlsCertificateApi;
 }
 
 export function CertificateEditorDialog({
@@ -47,6 +49,7 @@ export function CertificateEditorDialog({
   onOpenChange,
   onSaved,
   onConvert,
+  certificateService = TlsCertificateService,
 }: CertificateEditorDialogProps) {
   const queryClient = useQueryClient();
   const form = useForm<ManualImportFormValues>({
@@ -56,13 +59,13 @@ export function CertificateEditorDialog({
 
   const certificateQuery = useQuery({
     queryKey: ['openflare', 'tls-certificates', 'content', certificateId],
-    queryFn: () => TlsCertificateService.getContent(certificateId as number),
+    queryFn: () => certificateService.getContent(certificateId as number),
     enabled: open && certificateId !== null,
   });
 
   const updateMutation = useMutation({
     mutationFn: (values: ManualImportFormValues) =>
-      TlsCertificateService.update(
+      certificateService.update(
         certificateId as number,
         toManualPayload(values),
       ),

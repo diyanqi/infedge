@@ -14,9 +14,10 @@ import (
 )
 
 type proxyRouteJSONFields struct {
-	cacheRulesJSON    string
-	upstreamsJSON     string
-	customHeadersJSON string
+	cacheRulesJSON      string
+	upstreamsJSON       string
+	upstreamWeightsJSON string
+	customHeadersJSON   string
 }
 
 func resolveProxyRouteUpstreams(ctx context.Context, upstreamType string, input Input) (string, *uint, []string, error) {
@@ -44,6 +45,7 @@ func resolveProxyRouteUpstreams(ctx context.Context, upstreamType string, input 
 
 func marshalProxyRouteJSONFields(
 	upstreams []string,
+	upstreamWeights []int,
 	cacheRules []string,
 	customHeaders []CustomHeaderInput,
 ) (*proxyRouteJSONFields, error) {
@@ -55,14 +57,19 @@ func marshalProxyRouteJSONFields(
 	if err != nil {
 		return nil, err
 	}
+	upstreamWeightsJSON, err := json.Marshal(upstreamWeights)
+	if err != nil {
+		return nil, err
+	}
 	customHeadersJSON, err := json.Marshal(customHeaders)
 	if err != nil {
 		return nil, err
 	}
 	return &proxyRouteJSONFields{
-		cacheRulesJSON:    string(cacheRulesJSON),
-		upstreamsJSON:     string(upstreamsJSON),
-		customHeadersJSON: string(customHeadersJSON),
+		cacheRulesJSON:      string(cacheRulesJSON),
+		upstreamsJSON:       string(upstreamsJSON),
+		upstreamWeightsJSON: string(upstreamWeightsJSON),
+		customHeadersJSON:   string(customHeadersJSON),
 	}, nil
 }
 
@@ -96,6 +103,7 @@ func populateProxyRouteFields(
 	route.OriginURL = upstreams[0]
 	route.OriginHost = originHost
 	route.Upstreams = jsonFields.upstreamsJSON
+	route.UpstreamWeights = jsonFields.upstreamWeightsJSON
 	route.Enabled = input.Enabled
 	route.EnableHTTPS = input.EnableHTTPS
 	route.RedirectHTTP = input.RedirectHTTP

@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Eye, Plus, Trash2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  Eye,
+  Plus,
+  Settings2,
+  ShieldAlert,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -34,6 +41,7 @@ import {
 } from '@/components/ui/tooltip';
 import {
   ZoneDomainService,
+  SiteService,
   type ProxyRouteItem,
   type TlsCertificateItem,
   type ZoneDomainItem,
@@ -61,6 +69,16 @@ export function ZoneDomainsTable({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<ZoneDomainItem | null>(null);
+
+  const verify = useMutation({
+    mutationFn: (id: number) => SiteService.verify(id),
+    onSuccess: async () => {
+      toast.success('域名验证成功');
+      await onChanged();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : '域名验证失败'),
+  });
 
   const remove = useMutation({
     mutationFn: (id: number) => ZoneDomainService.deleteById(zoneId, id),
@@ -143,6 +161,20 @@ export function ZoneDomainsTable({
                         >
                           {domain.domain}
                         </span>
+                        <div className='mt-1 text-[10px] text-muted-foreground'>
+                          {domain.verification_status === 'verified'
+                            ? 'TXT 已验证'
+                            : '待 TXT 验证'}
+                        </div>
+                        {domain.verification_status !== 'verified' &&
+                        domain.verification_token ? (
+                          <div
+                            className='max-w-[220px] truncate text-[10px] text-muted-foreground'
+                            title={`TXT _openflare-verification.${domain.domain} = ${domain.verification_token}`}
+                          >
+                            TXT 值：{domain.verification_token}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className='py-1 font-mono text-[10px] whitespace-nowrap text-muted-foreground'>
                         {certLabel}
@@ -179,6 +211,50 @@ export function ZoneDomainsTable({
                         onClick={(event) => event.stopPropagation()}
                       >
                         <div className='flex items-center justify-center gap-0.5'>
+                          {domain.verification_status !== 'verified' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant='ghost'
+                                  size='icon'
+                                  className='h-6 w-6 text-muted-foreground hover:text-foreground'
+                                  disabled={verify.isPending}
+                                  onClick={() => verify.mutate(domain.id)}
+                                >
+                                  <ShieldAlert className='size-3' />
+                                  <span className='sr-only'>验证域名</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side='top' className='text-xs'>
+                                验证域名
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <CheckCircle2 className='size-3 text-primary' />
+                          )}
+                          {domain.verification_status === 'verified' &&
+                          !domain.proxy_route_id ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant='ghost'
+                                  size='icon'
+                                  className='h-6 w-6 text-muted-foreground hover:text-foreground'
+                                  asChild
+                                >
+                                  <Link
+                                    href={`/proxy-routes?domain_id=${domain.id}`}
+                                  >
+                                    <Settings2 className='size-3' />
+                                    <span className='sr-only'>配置 CDN</span>
+                                  </Link>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side='top' className='text-xs'>
+                                配置 CDN
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null}
                           {domain.proxy_route_id ? (
                             <Tooltip>
                               <TooltipTrigger asChild>

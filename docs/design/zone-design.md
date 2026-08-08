@@ -2,17 +2,23 @@
 
 ## 目标
 
-将“网站”重构为以可注册根域为入口的 Zone 管理体验。`example.com` 之类的 Zone 是稳定的管理边界；用户通过稳定 ID 路径进入该 Zone，查看并维护其中明确声明的域名、域名所绑定的反代路由和证书，以及路由级 WAF、Pages 等能力。
+将“网站”重构为以明确域名为入口的管理体验。`example.com` 之类的 Zone 仍是后台稳定的资源边界，但用户不需要先录入根域；用户提交任意根域或子域后，系统自动推导/复用 Zone，并创建一个待验证的明确域名。用户通过稳定 ID 路径进入域名对应的站点控制台，维护其反代路由和证书，以及路由级 WAF、Pages 等能力。
 
 本设计替代 `managed_domains` 的概念、表与 API。它不引入权威 DNS 解析记录管理。
 
 ## 范围与约束
 
-* Zone 根域使用 Public Suffix List 解析，例如 `api.example.co.uk` 归属 `example.co.uk`。
+* Zone 根域使用 Public Suffix List 解析，例如 `api.example.co.uk` 归属 `example.co.uk`；根域只作为内部归组键，不作为用户必填步骤。
 * URL 使用 ID：列表为 `/websites`，详情为 `/websites/:zoneId`；不使用域名作为 URL 参数。
 * Zone 域名必须是明确的 FQDN，禁止录入 `*.example.com`。TLS 证书可仍含通配符 SAN，并用于覆盖明确的 Zone 域名。
 * 一个 Zone 域名至多关联一条反代路由；一条反代路由可关联多个 Zone 域名，因而可跨 Zone 共享同一套上游、缓存、限流、WAF 与 Pages 配置。
 * 不新增 DNS 记录、边缘函数、预览子域或租户隔离能力。
+
+### 直接添加域名
+
+* `POST /api/v1/d/sites` 和 `POST /api/v1/custom/resources/sites` 接收一个明确 FQDN（根域或子域）。服务端使用 Public Suffix List 推导 Zone；同一用户已有该 Zone 时复用，否则创建新 Zone。
+* 请求成功后同时创建 `of_zone_domains` 记录并返回站点域名、Zone ID、域名 ID 和 TXT 验证信息。用户只需要对这个明确域名执行 TXT 验证，不再先声明或验证根域全部所有权。
+* 旧的 Zone/ZoneDomain CRUD 保留，用于兼容管理员维护和历史数据；新页面与新业务流程使用直接添加域名接口。
 
 ## 核心模型
 

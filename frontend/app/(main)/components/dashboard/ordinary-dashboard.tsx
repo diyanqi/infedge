@@ -157,7 +157,7 @@ function AccelerationOverview({
           icon={Server}
           label='托管域名'
           value={domains}
-          hint={`${zones.length} 个根域`}
+          hint={`${zones.length} 个域名分组`}
         />
         <Metric
           icon={Cloud}
@@ -209,7 +209,7 @@ function AccelerationOverview({
           )}
         </section>
         <SetupPanel
-          hasZone={zones.length > 0}
+          hasDomainGroup={zones.length > 0}
           hasOrigin={origins.length > 0}
           hasRoute={running > 0}
         />
@@ -333,15 +333,15 @@ function SiteItem({ route }: { route: ResourceRoute }) {
 }
 
 function SetupPanel({
-  hasZone,
+  hasDomainGroup,
   hasOrigin,
   hasRoute,
 }: {
-  hasZone: boolean;
+  hasDomainGroup: boolean;
   hasOrigin: boolean;
   hasRoute: boolean;
 }) {
-  const done = [hasZone, hasOrigin, hasRoute];
+  const done = [hasDomainGroup, hasOrigin, hasRoute];
   const progress = Math.round(
     (done.filter(Boolean).length / done.length) * 100,
   );
@@ -364,8 +364,8 @@ function SetupPanel({
       </div>
       <div className='mt-5 space-y-4'>
         <Step
-          done={hasZone}
-          title='添加根域'
+          done={hasDomainGroup}
+          title='添加域名'
           href='/resources/configure?new=1'
         />
         <Step

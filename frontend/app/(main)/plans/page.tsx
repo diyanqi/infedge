@@ -123,7 +123,7 @@ export default function PlansPage() {
               每日发布：{subscription.data.plan?.daily_publish_limit ?? 0} 次
             </span>
             <span>
-              资源额度：Zone {subscription.data.plan?.max_zones ?? 0} / 规则{' '}
+              资源额度：域名分组 {subscription.data.plan?.max_zones ?? 0} / 规则{' '}
               {subscription.data.plan?.max_routes ?? 0}
             </span>
           </CardContent>
@@ -213,7 +213,7 @@ export default function PlansPage() {
                   </p>
                   <p>
                     <Check className='mr-2 inline size-4 text-primary' />
-                    Zone {plan.max_zones} · 源站 {plan.max_origins} · 规则{' '}
+                    域名分组 {plan.max_zones} · 源站 {plan.max_origins} · 规则{' '}
                     {plan.max_routes}
                   </p>
                 </div>

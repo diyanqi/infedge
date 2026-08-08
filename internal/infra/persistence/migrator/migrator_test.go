@@ -96,6 +96,9 @@ func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 	if !sqliteDB.Migrator().HasTable("of_redeem_codes") {
 		t.Error("Migrate() did not create of_redeem_codes")
 	}
+	if !sqliteDB.Migrator().HasColumn(&model.ProxyRoute{}, "upstream_weights") {
+		t.Error("Migrate() did not add of_proxy_routes.upstream_weights")
+	}
 	channel := model.PaymentChannel{
 		Name: "test", Gateway: "https://pay.example.com", PID: "10001", SecretKey: "secret",
 	}

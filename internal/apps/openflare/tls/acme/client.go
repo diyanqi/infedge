@@ -22,7 +22,10 @@ import (
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/providers/dns/alidns"
 	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
+	"github.com/go-acme/lego/v4/providers/dns/huaweicloud"
+	"github.com/go-acme/lego/v4/providers/dns/tencentcloud"
 	"github.com/go-acme/lego/v4/registration"
 )
 
@@ -168,18 +171,52 @@ func GetOrCreateLegoClient(acmeEmail, privateKeyPEM, accountURL string, keyAlgor
 // SetupDNSProvider configures DNS-01 challenge for the lego client.
 func SetupDNSProvider(client *lego.Client, dnsType, dnsAuth string, dns1, dns2 string, disableCNAME, skipDNS bool) error {
 	var provider challengeProvider
+	var creds map[string]string
+	if err := json.Unmarshal([]byte(dnsAuth), &creds); err != nil {
+		return fmt.Errorf("failed to parse %s credentials: %v", dnsType, err)
+	}
 
 	switch dnsType {
 	case "cloudflare":
-		var creds map[string]string
-		if err := json.Unmarshal([]byte(dnsAuth), &creds); err != nil {
-			return fmt.Errorf("failed to parse cloudflare credentials: %v", err)
-		}
-
 		config := cloudflare.NewDefaultConfig()
 		config.AuthToken = creds["api_token"]
+		if config.AuthToken == "" {
+			config.AuthToken = creds["token"]
+		}
 
 		p, err := cloudflare.NewDNSProviderConfig(config)
+		if err != nil {
+			return err
+		}
+		provider = p
+	case "aliyun", "alicloud", "alidns":
+		config := alidns.NewDefaultConfig()
+		config.APIKey = firstCredential(creds, "access_key", "access_key_id", "api_key")
+		config.SecretKey = firstCredential(creds, "secret_key", "access_key_secret")
+		config.SecurityToken = creds["security_token"]
+		config.RegionID = creds["region_id"]
+		p, err := alidns.NewDNSProviderConfig(config)
+		if err != nil {
+			return err
+		}
+		provider = p
+	case "tencent", "tencentcloud", "dnspod", "qcloud":
+		config := tencentcloud.NewDefaultConfig()
+		config.SecretID = firstCredential(creds, "secret_id", "secretId", "access_key_id")
+		config.SecretKey = firstCredential(creds, "secret_key", "secretKey", "access_key_secret")
+		config.SessionToken = creds["session_token"]
+		config.Region = creds["region"]
+		p, err := tencentcloud.NewDNSProviderConfig(config)
+		if err != nil {
+			return err
+		}
+		provider = p
+	case "huawei", "huaweicloud":
+		config := huaweicloud.NewDefaultConfig()
+		config.AccessKeyID = firstCredential(creds, "access_key_id", "access_key", "ak")
+		config.SecretAccessKey = firstCredential(creds, "secret_access_key", "secret_key", "sk")
+		config.Region = creds["region"]
+		p, err := huaweicloud.NewDNSProviderConfig(config)
 		if err != nil {
 			return err
 		}
@@ -214,6 +251,15 @@ func SetupDNSProvider(client *lego.Client, dnsType, dnsAuth string, dns1, dns2 s
 	}
 
 	return client.Challenge.SetDNS01Provider(provider, opts...)
+}
+
+func firstCredential(creds map[string]string, keys ...string) string {
+	for _, key := range keys {
+		if value := creds[key]; value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 type challengeProvider interface {

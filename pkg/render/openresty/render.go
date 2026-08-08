@@ -643,7 +643,7 @@ func buildRouteUpstreamConfig(route Route, upstreams []string) routeUpstreamConf
 		if err != nil || parsed.Host == "" || parsed.Scheme == "" {
 			return routeUpstreamConfig{}
 		}
-		return routeUpstreamConfig{Name: buildRouteUpstreamName(route), Scheme: parsed.Scheme, ProxyPassURI: buildUpstreamProxyPassURI(parsed), Servers: []string{parsed.Host}, UsesNamedUpstream: true}
+		return routeUpstreamConfig{Name: buildRouteUpstreamName(route), Scheme: parsed.Scheme, ProxyPassURI: buildUpstreamProxyPassURI(parsed), Servers: []string{parsed.Host}, Weights: normalizedRenderWeights(route.UpstreamWeights, 1), UsesNamedUpstream: true}
 	}
 	servers := make([]string, 0, len(upstreams))
 	var scheme string
@@ -659,7 +659,18 @@ func buildRouteUpstreamConfig(route Route, upstreams []string) routeUpstreamConf
 		}
 		servers = append(servers, parsed.Host)
 	}
-	return routeUpstreamConfig{Name: buildRouteUpstreamName(route), Scheme: scheme, Servers: servers, UsesNamedUpstream: true}
+	return routeUpstreamConfig{Name: buildRouteUpstreamName(route), Scheme: scheme, Servers: servers, Weights: normalizedRenderWeights(route.UpstreamWeights, len(servers)), UsesNamedUpstream: true}
+}
+
+func normalizedRenderWeights(raw []int, count int) []int {
+	if len(raw) == count {
+		return raw
+	}
+	weights := make([]int, count)
+	for i := range weights {
+		weights[i] = 1
+	}
+	return weights
 }
 
 func normalizeRouteUpstreamType(raw string) string {
@@ -674,8 +685,16 @@ func normalizeRouteUpstreamType(raw string) string {
 func renderNamedUpstreamBlock(upstreamConfig routeUpstreamConfig) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "upstream %s {\n", upstreamConfig.Name)
-	for _, server := range upstreamConfig.Servers {
-		fmt.Fprintf(&builder, "    server %s max_fails=3 fail_timeout=10s;\n", server)
+	for i, server := range upstreamConfig.Servers {
+		weight := 1
+		if i < len(upstreamConfig.Weights) {
+			weight = upstreamConfig.Weights[i]
+		}
+		if weight == 1 {
+			fmt.Fprintf(&builder, "    server %s max_fails=3 fail_timeout=10s;\n", server)
+			continue
+		}
+		fmt.Fprintf(&builder, "    server %s weight=%d max_fails=3 fail_timeout=10s;\n", server, weight)
 	}
 	builder.WriteString("    keepalive 128;\n}\n\n")
 	return builder.String()

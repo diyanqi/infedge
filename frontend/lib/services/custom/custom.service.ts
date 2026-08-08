@@ -5,6 +5,7 @@ import type {
   PaymentOrder,
   PlanInput,
   ResourceCertificate,
+  DnsAccountItem,
   RedeemCode,
   ResourceDomain,
   ResourceOrigin,
@@ -12,7 +13,9 @@ import type {
   ResourceRouteWaf,
   ResourceWafRule,
   ResourcePolicy,
+  ResourcePagesProject,
   ResourceZone,
+  ResourceSite,
   SubscriptionPlan,
   UserSubscription,
 } from './types';
@@ -57,6 +60,15 @@ export class CustomService extends BaseService {
   ): Promise<ResourceZone> {
     return this.post('/resources/zones', { domain, claims_ownership });
   }
+  static createSite(domain: string): Promise<ResourceSite> {
+    return this.post('/resources/sites', { domain });
+  }
+  static verifySite(domainId: number): Promise<ResourceDomain> {
+    return this.post(`/resources/sites/${domainId}/verify`);
+  }
+  static listDnsAccounts(): Promise<DnsAccountItem[]> {
+    return this.get('/resources/tls-certificates/dns-accounts');
+  }
   static deleteZone(id: number): Promise<void> {
     return this.post(`/resources/zones/${id}/delete`);
   }
@@ -91,6 +103,9 @@ export class CustomService extends BaseService {
   }
   static listCertificates(): Promise<ResourceCertificate[]> {
     return this.get('/resources/tls-certificates');
+  }
+  static listPages(): Promise<ResourcePagesProject[]> {
+    return this.get('/resources/pages');
   }
   static listPolicies(): Promise<ResourcePolicy> {
     return this.get('/resources/policies');

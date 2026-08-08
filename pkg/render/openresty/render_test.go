@@ -596,6 +596,30 @@ func TestRenderMainConfigMapsHostsToOwners(t *testing.T) {
 	}
 }
 
+func TestRenderRouteConfigIncludesUpstreamWeights(t *testing.T) {
+	doc := Document{Routes: []Route{{
+		SiteName:        "weighted.example.com",
+		Domains:         []string{"weighted.example.com"},
+		Enabled:         true,
+		OriginURL:       "http://primary.example.com:8080",
+		Upstreams:       []string{"http://primary.example.com:8080", "http://backup.example.com:8080"},
+		UpstreamWeights: []int{7, 2},
+	}}}
+
+	rendered, err := RenderRouteConfig(doc, nil)
+	if err != nil {
+		t.Fatalf("RenderRouteConfig() error = %v", err)
+	}
+	for _, want := range []string{
+		"server primary.example.com:8080 weight=7 max_fails=3 fail_timeout=10s;",
+		"server backup.example.com:8080 weight=2 max_fails=3 fail_timeout=10s;",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("expected %q in route config, got:\n%s", want, rendered)
+		}
+	}
+}
+
 func TestRenderMainConfigEmitsLimitReqZonesByEffectiveRate(t *testing.T) {
 	doc := Document{
 		Routes: []Route{

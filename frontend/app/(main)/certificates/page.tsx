@@ -26,7 +26,13 @@ import {
 import { EmptyStateWithBorder } from '@/components/layout/empty';
 import { ErrorInline } from '@/components/layout/error';
 import { LoadingStateWithBorder } from '@/components/layout/loading';
+import { useUser } from '@/contexts/user-context';
+import {
+  CustomDnsAccountService,
+  CustomTlsCertificateService,
+} from '@/lib/services/custom';
 import type { TlsCertificateItem } from '@/lib/services/openflare';
+import { DnsAccountService } from '@/lib/services/openflare';
 import { TlsCertificateService } from '@/lib/services/openflare';
 import { formatDateTime } from '@/lib/utils';
 
@@ -45,6 +51,7 @@ const certificatesQueryKey = ['openflare', 'tls-certificates'];
 type CertificateApplyMode = 'edit-acme' | 'convert-upload';
 
 export default function CertificatesPage() {
+  const { user, loading: userLoading } = useUser();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
@@ -60,13 +67,21 @@ export default function CertificatesPage() {
     useState<TlsCertificateItem | null>(null);
   const [applyMode, setApplyMode] = useState<CertificateApplyMode>('edit-acme');
 
+  const certificateService = user?.is_admin
+    ? TlsCertificateService
+    : CustomTlsCertificateService;
+  const dnsAccountService = user?.is_admin
+    ? DnsAccountService
+    : CustomDnsAccountService;
+
   const certificatesQuery = useQuery({
     queryKey: certificatesQueryKey,
-    queryFn: () => TlsCertificateService.list(),
+    queryFn: () => certificateService.list(),
+    enabled: !userLoading && Boolean(user),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => TlsCertificateService.deleteById(id),
+    mutationFn: (id: number) => certificateService.deleteById(id),
     onSuccess: async () => {
       toast.success('证书已删除');
       setDeleteTarget(null);
@@ -76,7 +91,7 @@ export default function CertificatesPage() {
   });
 
   const renewMutation = useMutation({
-    mutationFn: (id: number) => TlsCertificateService.renew(id),
+    mutationFn: (id: number) => certificateService.renew(id),
     onSuccess: async (cert) => {
       toast.success(`证书 ${cert.name} 续期任务已提交`);
       await queryClient.invalidateQueries({ queryKey: certificatesQueryKey });
@@ -269,6 +284,7 @@ export default function CertificatesPage() {
       <CertificateImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
+        certificateService={certificateService}
         onImported={(certificate) =>
           toast.success(`证书 ${certificate.name} 已导入`)
         }
@@ -277,6 +293,8 @@ export default function CertificatesPage() {
       <CertificateApplyDialog
         open={applyOpen && !applyCertificate}
         onOpenChange={setApplyOpen}
+        certificateService={certificateService}
+        dnsAccountService={dnsAccountService}
         onApplied={(certificate) =>
           toast.success(`证书 ${certificate.name} 申请任务已提交`)
         }
@@ -291,6 +309,8 @@ export default function CertificatesPage() {
           }}
           mode={applyMode}
           certificate={applyCertificate}
+          certificateService={certificateService}
+          dnsAccountService={dnsAccountService}
           onApplied={(certificate) => {
             setApplyCertificate(null);
             toast.success(
@@ -319,12 +339,14 @@ export default function CertificatesPage() {
           }
         }}
         deleting={deleteMutation.isPending}
+        certificateService={certificateService}
       />
 
       <CertificateEditorDialog
         certificateId={selectedCertificateId}
         open={editorOpen}
         onOpenChange={setEditorOpen}
+        certificateService={certificateService}
         onSaved={(certificate) =>
           toast.success(`证书 ${certificate.name} 已更新`)
         }

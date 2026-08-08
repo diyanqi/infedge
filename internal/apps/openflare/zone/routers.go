@@ -66,6 +66,51 @@ func CreateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response.OK(item))
 }
 
+// CreateSiteHandler onboards one exact domain and prepares its ownership proof.
+// @Summary 直接创建 CDN 域名
+// @Tags openflare-zone
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body zone.SiteInput true "域名参数"
+// @Success 200 {object} response.Any{data=zone.Site}
+// @Failure 400 {object} response.Any
+// @Failure 409 {object} response.Any
+// @Router /api/v1/d/sites [post]
+func CreateSiteHandler(c *gin.Context) {
+	var input SiteInput
+	if !apiutil.BindJSON(c, &input) {
+		return
+	}
+	item, err := CreateSite(c.Request.Context(), input)
+	if abort(c, err, errZoneNotFound) {
+		return
+	}
+	c.JSON(http.StatusOK, response.OK(item))
+}
+
+// VerifySiteDomainHandler verifies a directly onboarded domain.
+// @Summary 验证 CDN 域名所有权
+// @Tags openflare-zone
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "域名 ID"
+// @Success 200 {object} response.Any{data=model.ZoneDomain}
+// @Failure 400 {object} response.Any
+// @Failure 404 {object} response.Any
+// @Router /api/v1/d/sites/{id}/verify [post]
+func VerifySiteDomainHandler(c *gin.Context) {
+	id, ok := apiutil.IDParam(c)
+	if !ok {
+		return
+	}
+	item, err := VerifyOwnedSiteDomain(c.Request.Context(), id, 0)
+	if abort(c, err, errDomainNotFound) {
+		return
+	}
+	c.JSON(http.StatusOK, response.OK(item))
+}
+
 // GetOverviewHandler returns a Zone and its explicit domains.
 // @Summary 获取 Zone 概览
 // @Tags openflare-zone

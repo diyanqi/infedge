@@ -4,6 +4,8 @@ import type {
   ZoneDomainMutationPayload,
   ZoneItem,
   ZoneMutationPayload,
+  SiteItem,
+  SiteMutationPayload,
   ZoneOverview,
   ZoneStats,
   ZoneStatsRange,
@@ -34,6 +36,18 @@ export class ZoneService extends OpenFlareBaseService {
   }
   static deleteById(id: number): Promise<void> {
     return this.post<void>(`/${id}/delete`);
+  }
+}
+
+export class SiteService extends OpenFlareBaseService {
+  protected static override readonly basePath = '/api/v1/d/sites';
+
+  static create(payload: SiteMutationPayload): Promise<SiteItem> {
+    return this.post<SiteItem>('/', payload);
+  }
+
+  static verify(id: number): Promise<ZoneDomainItem> {
+    return this.post<ZoneDomainItem>(`/${id}/verify`);
   }
 }
 

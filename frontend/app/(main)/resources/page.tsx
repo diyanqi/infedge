@@ -23,7 +23,7 @@ import { LoadingStateWithBorder } from '@/components/layout/loading';
 import { ErrorInline } from '@/components/layout/error';
 import { EmptyStateWithBorder } from '@/components/layout/empty';
 import { CustomService } from '@/lib/services/custom';
-import type { ResourceRoute } from '@/lib/services/custom';
+import type { ResourceDomain, ResourceRoute } from '@/lib/services/custom';
 
 function routeStatus(route: ResourceRoute) {
   if (!route.enabled) return { label: '已停用', variant: 'outline' as const };
@@ -99,6 +99,16 @@ export default function ResourcesPage() {
     (count, query) => count + (query.data?.domains.length ?? 0),
     0,
   );
+  const pendingDomains = useMemo(() => {
+    const routeDomainIds = new Set(
+      (routes.data ?? []).flatMap((route) => route.zone_domain_ids),
+    );
+    return zoneDetails.flatMap((query) =>
+      (query.data?.domains ?? []).filter(
+        (domain) => !routeDomainIds.has(domain.id),
+      ),
+    );
+  }, [routes.data, zoneDetails]);
   const filteredRoutes = useMemo(() => {
     const value = keyword.trim().toLowerCase();
     if (!value) return routes.data ?? [];
@@ -186,6 +196,25 @@ export default function ResourcesPage() {
         />
       </section>
 
+      {pendingDomains.length > 0 && (
+        <section className='overflow-hidden rounded-lg border bg-card'>
+          <div className='flex items-center justify-between gap-3 border-b px-4 py-4'>
+            <div>
+              <h2 className='text-base font-semibold'>待配置域名</h2>
+              <p className='mt-1 text-xs text-muted-foreground'>
+                完成 TXT 验证后，为域名配置源站和 CDN 规则。
+              </p>
+            </div>
+            <Badge variant='outline'>{pendingDomains.length}</Badge>
+          </div>
+          <div className='divide-y'>
+            {pendingDomains.map((domain) => (
+              <PendingDomainRow key={domain.id} domain={domain} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className='overflow-hidden rounded-lg border bg-card'>
         <div className='flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between'>
           <div>
@@ -234,7 +263,7 @@ export default function ResourcesPage() {
           <div className='min-w-0 flex-1'>
             <p className='text-sm font-medium'>接入新网站</p>
             <p className='mt-1 text-xs text-muted-foreground'>
-              添加根域、子域和源站
+              添加域名并配置源站
             </p>
           </div>
           <ArrowRight className='size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5' />
@@ -260,6 +289,35 @@ function PageTitle() {
     <div className='flex items-center gap-2'>
       <Globe className='size-5 text-primary' />
       <h1 className='text-2xl font-semibold tracking-tight'>网站安全加速</h1>
+    </div>
+  );
+}
+
+function PendingDomainRow({ domain }: { domain: ResourceDomain }) {
+  const verified = domain.verification_status === 'verified';
+  return (
+    <div className='flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='flex min-w-0 items-center gap-3'>
+        {verified ? (
+          <CheckCircle2 className='size-5 shrink-0 text-primary' />
+        ) : (
+          <CircleAlert className='size-5 shrink-0 text-muted-foreground' />
+        )}
+        <div className='min-w-0'>
+          <p className='truncate text-sm font-medium'>{domain.domain}</p>
+          <p className='mt-1 text-xs text-muted-foreground'>
+            {verified
+              ? '所有权已验证，等待 CDN 配置'
+              : '等待 DNS TXT 所有权验证'}
+          </p>
+        </div>
+      </div>
+      <Button variant='outline' size='sm' asChild>
+        <Link href={`/resources/configure?domain=${domain.id}`}>
+          <ArrowRight data-icon='inline-start' />
+          {verified ? '配置域名' : '验证所有权'}
+        </Link>
+      </Button>
     </div>
   );
 }

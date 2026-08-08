@@ -206,8 +206,9 @@ func TestSecurityWAFTLSMigrationFlow(t *testing.T) {
 		routeZone := model.Zone{Domain: "example-route.com"}
 		require.NoError(t, db.DB(context.Background()).Create(&routeZone).Error)
 		routeZoneDomain := model.ZoneDomain{
-			ZoneID: routeZone.ID,
-			Domain: "route.example-route.com",
+			ZoneID:             routeZone.ID,
+			Domain:             "route.example-route.com",
+			VerificationStatus: "verified",
 		}
 		require.NoError(t, db.DB(context.Background()).Create(&routeZoneDomain).Error)
 

@@ -23,7 +23,7 @@ OpenFlare 适合需要统一管理多台 OpenResty 代理节点的团队，具�
 | --- | --- | --- |
 | **反代配置管理** | 以网站规则（Proxy Route）为聚合边界，支持多域名与多上游负载均衡 | [新建反代配置](../guide/proxy-config.md) |
 | **边缘缓存** | 单节点 OpenResty `proxy_cache`；默认 static 扩展名 + 源站头/Set-Cookie 闸门 + 默认 Edge TTL（对标 CF 默认模型） | [边缘缓存策略设计](./edge-cache-design.md) |
-| **Zone 与域名管理** | 以可注册根域为管理入口，聚合明确域名、域名证书与反代路由 | [Zone 与域名资源设计](./zone-design.md) |
+| **Zone 与域名管理** | 用户直接提交根域或子域，系统在后台按可注册根域归组，聚合明确域名、域名证书与反代路由 | [Zone 与域名资源设计](./zone-design.md) |
 | **配置版本控制** | 支持全局单一激活版本的预览、发布、不可变快照历史与秒级一键回滚 | [Agent 与发布模型](./agent-design.md) |
 | **WAF 安全防护** | 支持可视化 DAG 编排规则、手动/自动/订阅型 IP 组、GeoIP 匹配与 PoW CC 防护 | [WAF 设计](./waf-design.md) / [WAF 可编排规则设计](./waf-orchestration-design.md) / [WAF 使用指南](../guide/waf-usage.md) |
 | **内网穿透** | 通过中继节点（Relay）与内网客户端（OpenFlared），反向穿透暴露内网 Web 服务 | [内网穿透设计](./tunnel-design.md) / [穿透使用指南](../guide/tunnel-usage.md) |
@@ -31,7 +31,7 @@ OpenFlare 适合需要统一管理多台 OpenResty 代理节点的团队，具�
 | **TLS 证书自动续期** | 将证书显式绑定到 Zone 域名，并通过 ACME 协议向 Let's Encrypt 申请/续期证书 | [Zone 与域名资源设计](./zone-design.md) |
 | **多节点监控与观测** | 访问日志为业务流量唯一真相；Agent 只上报明细与主机读数，Server 统一聚合；与 Zone/看板对账 | [观测数据传输模型](./observability-transport-model.md) / [边缘可观测与业务流量统计](./observability-design.md) / [上报协议与表结构](./observability-data-model.md) / [系统架构](./architecture.md) |
 | **用户套餐与资源隔离** | 普通用户按套餐管理自己的 Zone、域名、源站和 CDN 规则，购买额度并受发布次数和流量策略约束；管理员维护套餐、支付渠道和节点组 | [用户套餐、资源隔离与流量配额设计](./subscription-multitenancy.md) |
-| **普通用户域名控制台** | 普通用户按根域、子域和子域配置管理资源，支持 TXT 所有权验证、固定 CNAME 接入以及 owner-scoped TLS/WAF/Pages | [普通用户域名控制台设计](./ordinary-user-domain-console.md) |
+| **普通用户域名控制台** | 普通用户直接添加根域或子域，完成 TXT 所有权验证后进入域名级 CDN 配置，支持固定 CNAME 接入以及 owner-scoped TLS/WAF/Pages | [普通用户域名控制台设计](./ordinary-user-domain-console.md) |
 | **普通用户 CDN 控制台** | 普通用户以服务总览进入网站安全加速和 Makers，并按网站列表、站点控制台和配置页分层完成 CDN 操作 | [普通用户 CDN 控制台设计](./ordinary-user-dashboard.md) |
 
 ---

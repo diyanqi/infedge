@@ -13,6 +13,7 @@ const (
 	errProxyRouteZoneDomainNotFound  = "selected zone domain does not exist"
 	errProxyRouteZoneDomainDuplicate = "zone_domain_ids must not contain duplicates"
 	errProxyRouteZoneDomainBound     = "selected zone domain is already bound to another proxy route"
+	errProxyRouteDomainUnverified    = "域名尚未完成 DNS TXT 所有权验证"
 	errProxyRouteOriginEmpty         = "origin_url cannot be empty"
 	errProxyRouteOriginInvalid       = "origin URL format is invalid"
 	errProxyRouteOriginScheme        = "origin URL must start with http:// or https://"

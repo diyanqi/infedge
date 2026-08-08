@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw, Route, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,12 +42,20 @@ import { ProxyRouteCreateSheet } from './components/proxy-route-create-sheet';
 
 export function ProxyRoutesPageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialDomainId = Number(searchParams.get('domain_id'));
   const [routes, setRoutes] = useState<ProxyRouteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProxyRouteItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (Number.isInteger(initialDomainId) && initialDomainId > 0) {
+      setIsCreateOpen(true);
+    }
+  }, [initialDomainId]);
 
   const fetchRoutes = useCallback(async () => {
     setLoading(true);
@@ -234,6 +242,11 @@ export function ProxyRoutesPageClient() {
       <ProxyRouteCreateSheet
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
+        initialDomainId={
+          Number.isInteger(initialDomainId) && initialDomainId > 0
+            ? initialDomainId
+            : null
+        }
         onCreated={(route) => {
           toast.success('网站已创建');
           void fetchRoutes();

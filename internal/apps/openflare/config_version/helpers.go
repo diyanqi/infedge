@@ -6,6 +6,7 @@ package config_version
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -58,6 +59,30 @@ func decodeStoredUpstreams(raw string, fallbackOriginURL string) ([]string, erro
 		return nil, fmt.Errorf("upstreams payload is invalid")
 	}
 	return normalizeUpstreams(fallbackOriginURL, upstreams)
+}
+
+func decodeStoredUpstreamWeights(raw string, count int) ([]int, error) {
+	weights := make([]int, count)
+	for i := range weights {
+		weights[i] = 1
+	}
+	if strings.TrimSpace(raw) == "" || strings.TrimSpace(raw) == "[]" {
+		return weights, nil
+	}
+	var parsed []int
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return nil, errors.New("upstream_weights payload is invalid")
+	}
+	if len(parsed) != count {
+		return nil, errors.New("upstream_weights count does not match upstreams")
+	}
+	for i, weight := range parsed {
+		if weight < 1 || weight > 1000 {
+			return nil, errors.New("upstream weight is out of range")
+		}
+		weights[i] = weight
+	}
+	return weights, nil
 }
 
 func normalizeUpstreams(originURL string, upstreams []string) ([]string, error) {

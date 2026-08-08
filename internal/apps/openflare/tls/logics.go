@@ -87,6 +87,19 @@ func GetCertificateContent(ctx context.Context, id uint) (*CertificateContent, e
 	if err != nil {
 		return nil, err
 	}
+	return certificateContent(certificate)
+}
+
+// GetCertificateContentOwned returns PEM content only for the certificate owner.
+func GetCertificateContentOwned(ctx context.Context, id uint, ownerID uint64) (*CertificateContent, error) {
+	certificate, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return certificateContent(certificate)
+}
+
+func certificateContent(certificate *model.TLSCertificate) (*CertificateContent, error) {
 	keyPEM, err := openSensitive(certificate.KeyPEM)
 	if err != nil {
 		return nil, err
@@ -121,6 +134,22 @@ func CreateCertificate(ctx context.Context, input CertificateInput) (*model.TLSC
 // CreateCertificateOwned creates a user-owned uploaded certificate.
 func CreateCertificateOwned(ctx context.Context, ownerID uint64, input CertificateInput) (*model.TLSCertificate, error) {
 	return createCertificate(ctx, ownerID, input)
+}
+
+// CreateCertificateFromFilesOwned creates an uploaded certificate for a user.
+func CreateCertificateFromFilesOwned(ctx context.Context, ownerID uint64, name string, certFile *multipart.FileHeader, keyFile *multipart.FileHeader, remark string) (*model.TLSCertificate, error) {
+	if certFile == nil || keyFile == nil {
+		return nil, errors.New(errCertificateFilesRequired)
+	}
+	certContent, err := readMultipartFile(certFile)
+	if err != nil {
+		return nil, err
+	}
+	keyContent, err := readMultipartFile(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return CreateCertificateOwned(ctx, ownerID, CertificateInput{Name: name, CertPEM: certContent, KeyPEM: keyContent, Remark: remark})
 }
 
 func createCertificate(ctx context.Context, ownerID uint64, input CertificateInput) (*model.TLSCertificate, error) {
@@ -170,17 +199,38 @@ func UpdateCertificate(ctx context.Context, id uint, input CertificateInput) (*m
 	if err != nil {
 		return nil, err
 	}
+	return updateCertificate(ctx, existing, input, 0)
+}
+
+// UpdateCertificateOwned updates an uploaded certificate only for its owner.
+func UpdateCertificateOwned(ctx context.Context, id uint, ownerID uint64, input CertificateInput) (*model.TLSCertificate, error) {
+	existing, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return updateCertificate(ctx, existing, input, ownerID)
+}
+
+func updateCertificate(ctx context.Context, existing *model.TLSCertificate, input CertificateInput, ownerID uint64) (*model.TLSCertificate, error) {
 	certificate, err := buildCertificate(ctx, existing, input)
 	if err != nil {
 		return nil, err
 	}
-	if err = repository.SaveTLSCertificate(ctx, certificate); err != nil {
+	err = saveCertificate(ctx, certificate, ownerID)
+	if err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, errors.New(errCertificateNameExists)
 		}
 		return nil, err
 	}
 	return sanitizeCertificateForResponse(certificate), nil
+}
+
+func saveCertificate(ctx context.Context, certificate *model.TLSCertificate, ownerID uint64) error {
+	if ownerID > 0 {
+		return repository.SaveOwnedTLSCertificate(ctx, certificate, ownerID)
+	}
+	return repository.SaveTLSCertificate(ctx, certificate)
 }
 
 // DeleteCertificate 删除证书。
@@ -194,9 +244,30 @@ func DeleteCertificate(ctx context.Context, id uint) error {
 	return repository.DeleteTLSCertificateRecord(ctx, id)
 }
 
+// DeleteCertificateOwned deletes a certificate only for its owner.
+func DeleteCertificateOwned(ctx context.Context, id uint, ownerID uint64) error {
+	if err := ensureCertificateNotReferenced(ctx, id); err != nil {
+		return err
+	}
+	if _, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID); err != nil {
+		return err
+	}
+	return repository.DeleteOwnedTLSCertificateRecord(ctx, id, ownerID)
+}
+
 // ApplyCertificate 申请 ACME 证书。
 func ApplyCertificate(ctx context.Context, input ApplyInput) (*model.TLSCertificate, error) {
+	return applyCertificate(ctx, 0, input)
+}
+
+// ApplyCertificateOwned starts an ACME request for one user-owned certificate.
+func ApplyCertificateOwned(ctx context.Context, ownerID uint64, input ApplyInput) (*model.TLSCertificate, error) {
+	return applyCertificate(ctx, ownerID, input)
+}
+
+func applyCertificate(ctx context.Context, ownerID uint64, input ApplyInput) (*model.TLSCertificate, error) {
 	cert := &model.TLSCertificate{
+		OwnerID:  ownerID,
 		Provider: tlsProviderACME,
 		CertPEM:  " ",
 		KeyPEM:   " ",
@@ -226,6 +297,19 @@ func UpdateACMECertificate(ctx context.Context, id uint, input ApplyInput) (*mod
 	if err != nil {
 		return nil, err
 	}
+	return updateACMECertificate(ctx, cert, input, 0)
+}
+
+// UpdateACMECertificateOwned updates an ACME certificate only for its owner.
+func UpdateACMECertificateOwned(ctx context.Context, id uint, ownerID uint64, input ApplyInput) (*model.TLSCertificate, error) {
+	cert, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return updateACMECertificate(ctx, cert, input, ownerID)
+}
+
+func updateACMECertificate(ctx context.Context, cert *model.TLSCertificate, input ApplyInput, ownerID uint64) (*model.TLSCertificate, error) {
 	if cert.Provider != tlsProviderACME {
 		return nil, errors.New(errCertificateOnlyACME)
 	}
@@ -233,11 +317,12 @@ func UpdateACMECertificate(ctx context.Context, id uint, input ApplyInput) (*mod
 	if cert.Name == "" {
 		return nil, errors.New(errCertificateNameRequired)
 	}
-	if err := repository.SaveTLSCertificate(ctx, cert); err != nil {
-		if isUniqueConstraintError(err) {
+	saveErr := saveCertificate(ctx, cert, ownerID)
+	if saveErr != nil {
+		if isUniqueConstraintError(saveErr) {
 			return nil, errors.New(errCertificateNameExists)
 		}
-		return nil, err
+		return nil, saveErr
 	}
 
 	go func(c *model.TLSCertificate) {
@@ -254,6 +339,19 @@ func ConvertCertificateToACME(ctx context.Context, id uint, input ApplyInput) (*
 	if err != nil {
 		return nil, err
 	}
+	return convertCertificateToACME(ctx, cert, input, 0)
+}
+
+// ConvertCertificateToACMEOwned converts an uploaded certificate only for its owner.
+func ConvertCertificateToACMEOwned(ctx context.Context, id uint, ownerID uint64, input ApplyInput) (*model.TLSCertificate, error) {
+	cert, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return convertCertificateToACME(ctx, cert, input, ownerID)
+}
+
+func convertCertificateToACME(ctx context.Context, cert *model.TLSCertificate, input ApplyInput, ownerID uint64) (*model.TLSCertificate, error) {
 	if cert.Provider != "upload" {
 		return nil, errors.New(errCertificateOnlyUploadConvert)
 	}
@@ -265,7 +363,7 @@ func ConvertCertificateToACME(ctx context.Context, id uint, input ApplyInput) (*
 		return nil, errors.New(errCertificateNameRequired)
 	}
 	cert.ApplyMessage = ""
-	if err := repository.SaveTLSCertificate(ctx, cert); err != nil {
+	if err := saveCertificate(ctx, cert, ownerID); err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, errors.New(errCertificateNameExists)
 		}
@@ -284,7 +382,7 @@ func ConvertCertificateToACME(ctx context.Context, id uint, input ApplyInput) (*
 		latest.Provider = tlsProviderACME
 		latest.ApplyStatus = tlsApplyStatusReady
 		latest.ApplyMessage = ""
-		_ = repository.SaveTLSCertificate(asyncCtx, latest)
+		_ = saveCertificate(asyncCtx, latest, ownerID)
 	}(cert)
 
 	return sanitizeCertificateForResponse(cert), nil
@@ -296,11 +394,24 @@ func RenewCertificate(ctx context.Context, id uint) (*model.TLSCertificate, erro
 	if err != nil {
 		return nil, err
 	}
+	return renewCertificate(ctx, cert, 0)
+}
+
+// RenewCertificateOwned renews an ACME certificate only for its owner.
+func RenewCertificateOwned(ctx context.Context, id uint, ownerID uint64) (*model.TLSCertificate, error) {
+	cert, err := repository.GetOwnedTLSCertificateByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return renewCertificate(ctx, cert, ownerID)
+}
+
+func renewCertificate(ctx context.Context, cert *model.TLSCertificate, ownerID uint64) (*model.TLSCertificate, error) {
 	if cert.Provider != tlsProviderACME {
 		return nil, errors.New(errCertificateOnlyACMERenew)
 	}
 
-	payload, err := json.Marshal(SSLSingleRenewPayload{ID: id})
+	payload, err := json.Marshal(SSLSingleRenewPayload{ID: cert.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +423,7 @@ func RenewCertificate(ctx context.Context, id uint) (*model.TLSCertificate, erro
 
 	cert.ApplyStatus = tlsApplyStatusApplying
 	cert.ApplyMessage = ""
-	if err := repository.SaveTLSCertificate(ctx, cert); err != nil {
+	if err := saveCertificate(ctx, cert, ownerID); err != nil {
 		return nil, err
 	}
 	return sanitizeCertificateForResponse(cert), nil

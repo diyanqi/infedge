@@ -16,6 +16,7 @@ import {
 import { EmptyStateWithBorder } from '@/components/layout/empty';
 import { ErrorInline } from '@/components/layout/error';
 import { LoadingStateWithBorder } from '@/components/layout/loading';
+import type { TlsCertificateApi } from '@/lib/services/custom';
 import { TlsCertificateService } from '@/lib/services/openflare';
 import { formatDateTime } from '@/lib/utils';
 
@@ -29,6 +30,7 @@ interface CertificateDetailDialogProps {
   onEdit: () => void;
   onDelete: () => void;
   deleting?: boolean;
+  certificateService?: TlsCertificateApi;
 }
 
 export function CertificateDetailDialog({
@@ -38,16 +40,17 @@ export function CertificateDetailDialog({
   onEdit,
   onDelete,
   deleting = false,
+  certificateService = TlsCertificateService,
 }: CertificateDetailDialogProps) {
   const certificateQuery = useQuery({
     queryKey: ['openflare', 'tls-certificates', 'detail', certificateId],
-    queryFn: () => TlsCertificateService.getById(certificateId as number),
+    queryFn: () => certificateService.getById(certificateId as number),
     enabled: open && certificateId !== null,
   });
 
   const contentQuery = useQuery({
     queryKey: ['openflare', 'tls-certificates', 'content', certificateId],
-    queryFn: () => TlsCertificateService.getContent(certificateId as number),
+    queryFn: () => certificateService.getContent(certificateId as number),
     enabled: open && certificateId !== null,
   });
 

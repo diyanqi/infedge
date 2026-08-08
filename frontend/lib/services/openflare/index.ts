@@ -7,7 +7,12 @@ export { ConfigVersionService } from './config-version.service';
 export { ApplyLogService } from './apply-log.service';
 export { DashboardService } from './dashboard.service';
 export { WafService } from './waf.service';
-export { ZoneDomainService, ZoneService, zoneQueryKey } from './zone.service';
+export {
+  SiteService,
+  ZoneDomainService,
+  ZoneService,
+  zoneQueryKey,
+} from './zone.service';
 export { TlsCertificateService } from './tls-certificate.service';
 export { DnsAccountService } from './dns-account.service';
 export { PagesService } from './pages.service';
@@ -134,6 +139,8 @@ export type {
   ZoneDomainMutationPayload,
   ZoneItem,
   ZoneMutationPayload,
+  SiteItem,
+  SiteMutationPayload,
   ZoneOverview,
   ZoneStats,
   ZoneStatsPoint,
@@ -160,7 +167,7 @@ import { PagesService } from './pages.service';
 import { ProxyRouteService } from './proxy-route.service';
 import { TlsCertificateService } from './tls-certificate.service';
 import { WafService } from './waf.service';
-import { ZoneDomainService, ZoneService } from './zone.service';
+import { SiteService, ZoneDomainService, ZoneService } from './zone.service';
 
 export const openflareServices = {
   node: NodeService,
@@ -170,6 +177,7 @@ export const openflareServices = {
   dashboard: DashboardService,
   waf: WafService,
   zone: ZoneService,
+  site: SiteService,
   zoneDomain: ZoneDomainService,
   tlsCertificate: TlsCertificateService,
   dnsAccount: DnsAccountService,

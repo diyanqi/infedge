@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import type { DnsAccountApi, TlsCertificateApi } from '@/lib/services/custom';
 import type { TlsCertificateItem } from '@/lib/services/openflare';
 import {
   DnsAccountService,
@@ -48,6 +49,8 @@ interface CertificateApplyDialogProps {
   onApplied?: (certificate: TlsCertificateItem) => void;
   mode?: CertificateApplyMode;
   certificate?: TlsCertificateItem | null;
+  certificateService?: TlsCertificateApi;
+  dnsAccountService?: DnsAccountApi;
 }
 
 export function CertificateApplyDialog({
@@ -56,6 +59,8 @@ export function CertificateApplyDialog({
   onApplied,
   mode = 'create',
   certificate,
+  certificateService = TlsCertificateService,
+  dnsAccountService = DnsAccountService,
 }: CertificateApplyDialogProps) {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
@@ -63,13 +68,13 @@ export function CertificateApplyDialog({
 
   const dnsAccountsQuery = useQuery({
     queryKey: ['openflare', 'dns-accounts'],
-    queryFn: () => DnsAccountService.list(),
+    queryFn: () => dnsAccountService.list(),
     enabled: open,
   });
 
   const defaultAcmeAccountQuery = useQuery({
     queryKey: ['openflare', 'acme-accounts', 'default'],
-    queryFn: () => TlsCertificateService.getDefaultAcmeAccount(),
+    queryFn: () => certificateService.getDefaultAcmeAccount(),
     enabled: open,
   });
 
@@ -129,12 +134,12 @@ export function CertificateApplyDialog({
   const applyMutation = useMutation({
     mutationFn: (values: AcmeApplyFormValues) => {
       if (mode === 'edit-acme' && certificate) {
-        return TlsCertificateService.updateAcme(certificate.id, values);
+        return certificateService.updateAcme(certificate.id, values);
       }
       if (mode === 'convert-upload' && certificate) {
-        return TlsCertificateService.convertToAcme(certificate.id, values);
+        return certificateService.convertToAcme(certificate.id, values);
       }
-      return TlsCertificateService.apply(values);
+      return certificateService.apply(values);
     },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: certificatesQueryKey });

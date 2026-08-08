@@ -19,8 +19,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  SiteService,
   ZoneService,
   zoneQueryKey,
+  type SiteItem,
   type ZoneItem,
 } from '@/lib/services/openflare';
 
@@ -28,10 +30,10 @@ const schema = z.object({
   domain: z
     .string()
     .trim()
-    .min(1, '请输入 Zone 根域')
+    .min(1, '请输入域名')
     .refine(
       (value) => !/[*/?#@]|:\/\//.test(value),
-      '请输入不含协议或通配符的根域',
+      '请输入不含协议或通配符的根域或子域',
     ),
 });
 type Values = z.infer<typeof schema>;
@@ -40,10 +42,12 @@ export function ZoneEditorDialog({
   open,
   onOpenChange,
   zone,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange(open: boolean): void;
   zone?: ZoneItem | null;
+  onCreated?(site: SiteItem): void;
 }) {
   const queryClient = useQueryClient();
   const form = useForm<Values>({
@@ -53,14 +57,22 @@ export function ZoneEditorDialog({
   useEffect(() => {
     if (open) form.reset({ domain: zone?.domain ?? '' });
   }, [form, open, zone]);
-  const mutation = useMutation({
-    mutationFn: (values: Values) =>
-      zone
-        ? ZoneService.update(zone.id, { domain: values.domain.toLowerCase() })
-        : ZoneService.create({ domain: values.domain.toLowerCase() }),
-    onSuccess: async () => {
-      toast.success(zone ? 'Zone 已更新' : 'Zone 已创建');
+  const mutation = useMutation<ZoneItem | SiteItem, Error, Values>({
+    mutationFn: async (values) => {
+      if (zone) {
+        return ZoneService.update(zone.id, {
+          domain: values.domain.toLowerCase(),
+        });
+      }
+      return SiteService.create({
+        domain: values.domain.toLowerCase(),
+      });
+    },
+    onSuccess: async (result) => {
+      const site = !zone && 'zone' in result ? result : undefined;
+      toast.success(zone ? 'Zone 已更新' : '域名已添加，请完成 TXT 验证');
       await queryClient.invalidateQueries({ queryKey: zoneQueryKey });
+      if (site) onCreated?.(site);
       onOpenChange(false);
     },
     onError: (error) =>
@@ -70,9 +82,9 @@ export function ZoneEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{zone ? '编辑 Zone' : '新增 Zone'}</DialogTitle>
+          <DialogTitle>{zone ? '编辑 Zone' : '新增 CDN 域名'}</DialogTitle>
           <DialogDescription>
-            Zone 仅接受可注册根域，例如 example.com。
+            直接输入根域或子域，例如 example.com 或 www.example.com。
           </DialogDescription>
         </DialogHeader>
         <form
@@ -83,10 +95,10 @@ export function ZoneEditorDialog({
           )}
         >
           <div className='space-y-1.5'>
-            <Label htmlFor='zone-domain'>根域</Label>
+            <Label htmlFor='zone-domain'>域名</Label>
             <Input
               id='zone-domain'
-              placeholder='example.com'
+              placeholder='example.com 或 www.example.com'
               {...form.register('domain')}
             />
             {form.formState.errors.domain && (
@@ -108,7 +120,7 @@ export function ZoneEditorDialog({
             {mutation.isPending && (
               <Loader2 className='mr-1 size-4 animate-spin' />
             )}
-            {zone ? '保存修改' : '新增 Zone'}
+            {zone ? '保存修改' : '添加域名'}
           </Button>
         </DialogFooter>
       </DialogContent>

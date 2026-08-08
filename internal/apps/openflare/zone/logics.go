@@ -36,6 +36,17 @@ type DomainInput struct {
 	CertID *uint  `json:"cert_id"`
 }
 
+// SiteInput is the one-step domain onboarding payload.
+type SiteInput struct {
+	Domain string `json:"domain"`
+}
+
+// Site is the result of onboarding one explicit hostname.
+type Site struct {
+	Zone   model.Zone       `json:"zone"`
+	Domain model.ZoneDomain `json:"domain"`
+}
+
 // Overview joins a Zone with its explicit domains.
 type Overview struct {
 	Zone    model.Zone         `json:"zone"`
@@ -189,6 +200,70 @@ func CreateOwned(ctx context.Context, userID uint64, input Input) (*model.Zone, 
 	return create(ctx, userID, input)
 }
 
+// HasOwnedRoot reports whether the domain's derived Zone already exists.
+func HasOwnedRoot(ctx context.Context, userID uint64, rawDomain string) (bool, error) {
+	domain, err := normalizeDomain(rawDomain)
+	if err != nil {
+		return false, err
+	}
+	root, err := zoneRoot(domain)
+	if err != nil {
+		return false, err
+	}
+	_, err = repository.GetZoneByDomainAndOwner(ctx, root, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func createSite(ctx context.Context, ownerID uint64, input SiteInput) (*Site, error) {
+	domain, err := normalizeDomain(input.Domain)
+	if err != nil {
+		if strings.TrimSpace(input.Domain) == "" {
+			return nil, errors.New(errSiteDomainRequired)
+		}
+		return nil, err
+	}
+	root, err := zoneRoot(domain)
+	if err != nil {
+		return nil, errors.New(errDomainInvalid)
+	}
+	zone, err := repository.GetZoneByDomainAndOwner(ctx, root, ownerID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		zone = &model.Zone{
+			OwnerID:            ownerID,
+			Domain:             root,
+			ClaimsOwnership:    false,
+			VerificationStatus: "pending",
+			VerificationToken:  newVerificationToken(),
+		}
+		if err := repository.CreateZone(ctx, zone); err != nil {
+			if isUnique(err) {
+				return nil, errors.New(errDomainExists)
+			}
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	domainItem, err := createDomain(ctx, zone.ID, DomainInput{Domain: domain}, false)
+	if err != nil {
+		return nil, err
+	}
+	return &Site{Zone: *zone, Domain: *domainItem}, nil
+}
+
+// CreateSite onboards one explicit hostname for an administrator.
+func CreateSite(ctx context.Context, input SiteInput) (*Site, error) {
+	return createSite(ctx, 0, input)
+}
+
+// CreateOwnedSite onboards one explicit hostname for an ordinary user.
+func CreateOwnedSite(ctx context.Context, userID uint64, input SiteInput) (*Site, error) {
+	return createSite(ctx, userID, input)
+}
+
 // UpdateOwned updates an owned zone.
 func UpdateOwned(ctx context.Context, id uint, userID uint64, input Input) (*model.Zone, error) {
 	if _, err := repository.GetOwnedZoneByID(ctx, id, userID); err != nil {
@@ -244,6 +319,10 @@ func GetOverview(ctx context.Context, id uint) (*Overview, error) {
 
 // CreateDomain adds a validated exact hostname to a Zone.
 func CreateDomain(ctx context.Context, zoneID uint, input DomainInput) (*model.ZoneDomain, error) {
+	return createDomain(ctx, zoneID, input, true)
+}
+
+func createDomain(ctx context.Context, zoneID uint, input DomainInput, inheritZoneOwnership bool) (*model.ZoneDomain, error) {
 	zone, err := repository.GetZoneByID(ctx, zoneID)
 	if err != nil {
 		return nil, err
@@ -263,7 +342,7 @@ func CreateDomain(ctx context.Context, zoneID uint, input DomainInput) (*model.Z
 	}
 	status := "pending"
 	var verifiedAt *time.Time
-	if zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
+	if inheritZoneOwnership && zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
 		status = zoneVerificationStatusVerified
 		now := time.Now().UTC()
 		verifiedAt = &now
@@ -325,6 +404,23 @@ func VerifyOwnedDomain(ctx context.Context, zoneID, domainID uint, ownerID uint6
 		now := time.Now().UTC()
 		domain.VerificationStatus, domain.VerifiedAt = zoneVerificationStatusVerified, &now
 	}
+	if err := repository.SaveZoneDomain(ctx, domain); err != nil {
+		return nil, err
+	}
+	return domain, nil
+}
+
+// VerifyOwnedSiteDomain verifies a domain returned by the direct onboarding API.
+func VerifyOwnedSiteDomain(ctx context.Context, domainID uint, ownerID uint64) (*model.ZoneDomain, error) {
+	domain, err := repository.GetOwnedZoneDomainByIDAnyZone(ctx, domainID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyTXT(ctx, "_openflare-verification."+domain.Domain, domain.VerificationToken); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	domain.VerificationStatus, domain.VerifiedAt = zoneVerificationStatusVerified, &now
 	if err := repository.SaveZoneDomain(ctx, domain); err != nil {
 		return nil, err
 	}

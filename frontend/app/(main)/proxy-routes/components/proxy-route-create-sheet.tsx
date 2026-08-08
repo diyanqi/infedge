@@ -124,12 +124,14 @@ const defaultValues: CreateProxyRouteFormValues = {
 interface ProxyRouteCreateSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialDomainId?: number | null;
   onCreated: (route: ProxyRouteItem) => void;
 }
 
 export function ProxyRouteCreateSheet({
   open,
   onOpenChange,
+  initialDomainId = null,
   onCreated,
 }: ProxyRouteCreateSheetProps) {
   const form = useForm<CreateProxyRouteFormValues>({
@@ -171,10 +173,11 @@ export function ProxyRouteCreateSheet({
   const upstreamType = form.watch('upstream_type');
 
   useEffect(() => {
-    if (!open) {
-      form.reset(defaultValues);
-    }
-  }, [form, open]);
+    form.reset({
+      ...defaultValues,
+      zone_domain_ids: open && initialDomainId ? [initialDomainId] : [],
+    });
+  }, [form, initialDomainId, open]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     let originUrl = '';

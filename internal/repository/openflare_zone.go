@@ -29,6 +29,15 @@ func GetZoneByID(ctx context.Context, id uint) (*model.Zone, error) {
 	return &zone, nil
 }
 
+// GetZoneByDomainAndOwner returns the internal Zone grouping for one owner.
+func GetZoneByDomainAndOwner(ctx context.Context, domain string, ownerID uint64) (*model.Zone, error) {
+	var zone model.Zone
+	if err := db.DB(ctx).Where("domain = ? AND owner_id = ?", domain, ownerID).First(&zone).Error; err != nil {
+		return nil, err
+	}
+	return &zone, nil
+}
+
 // CreateZone creates a zone record.
 func CreateZone(ctx context.Context, zone *model.Zone) error {
 	return db.DB(ctx).Create(zone).Error
@@ -78,6 +87,17 @@ func CountZoneDomainsByZoneID(ctx context.Context, zoneID uint) (int64, error) {
 func GetZoneDomainByZoneAndID(ctx context.Context, zoneID, id uint) (*model.ZoneDomain, error) {
 	var item model.ZoneDomain
 	if err := db.DB(ctx).Where("id = ? AND zone_id = ?", id, zoneID).First(&item).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// GetOwnedZoneDomainByIDAnyZone returns a domain only when its Zone belongs to ownerID.
+func GetOwnedZoneDomainByIDAnyZone(ctx context.Context, id uint, ownerID uint64) (*model.ZoneDomain, error) {
+	var item model.ZoneDomain
+	if err := db.DB(ctx).Joins("JOIN of_zones ON of_zones.id = of_zone_domains.zone_id").
+		Where("of_zone_domains.id = ? AND of_zones.owner_id = ?", id, ownerID).
+		First(&item).Error; err != nil {
 		return nil, err
 	}
 	return &item, nil

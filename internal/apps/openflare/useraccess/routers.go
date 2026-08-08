@@ -41,6 +41,8 @@ func RegisterRoutes(api *gin.RouterGroup) {
 	group.POST("/zones/:id/domains/:domain_id/update", UpdateDomain)
 	group.POST("/zones/:id/verify", VerifyZone)
 	group.POST("/zones/:id/domains/:domain_id/verify", VerifyDomain)
+	group.POST("/sites", CreateSite)
+	group.POST("/sites/:id/verify", VerifySite)
 	group.GET("/origins", ListOrigins)
 	group.POST("/origins", CreateOrigin)
 	group.POST("/origins/:id/update", UpdateOrigin)
@@ -122,6 +124,62 @@ func CreateZone(c *gin.Context) {
 		return
 	}
 	row, err := zone.CreateOwned(ctx, id, input)
+	respond(c, row, err)
+}
+
+// CreateSite onboards one exact root or subdomain in a single request.
+// @Summary 直接创建我的 CDN 域名
+// @Tags custom-resources
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body zone.SiteInput true "域名参数"
+// @Success 200 {object} response.Any{data=zone.Site}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Router /api/v1/custom/resources/sites [post]
+func CreateSite(c *gin.Context) {
+	ctx, uid := c.Request.Context(), userID(c)
+	var input zone.SiteInput
+	if !bind(c, &input) {
+		return
+	}
+	hasRoot, err := zone.HasOwnedRoot(ctx, uid, input.Domain)
+	if err != nil {
+		response.AbortBadRequest(c, err.Error())
+		return
+	}
+	if !hasRoot {
+		plan, planErr := planForUser(ctx, uid)
+		if planErr == nil {
+			planErr = checkQuota(ctx, uid, "zones", plan.MaxZones)
+		}
+		if planErr != nil {
+			response.AbortBadRequest(c, planErr.Error())
+			return
+		}
+	}
+	row, err := zone.CreateOwnedSite(ctx, uid, input)
+	respond(c, row, err)
+}
+
+// VerifySite verifies the exact domain created by CreateSite.
+// @Summary 验证我的 CDN 域名
+// @Tags custom-resources
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "域名 ID"
+// @Success 200 {object} response.Any{data=model.ZoneDomain}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Failure 404 {object} response.Any
+// @Router /api/v1/custom/resources/sites/{id}/verify [post]
+func VerifySite(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	row, err := zone.VerifyOwnedSiteDomain(c.Request.Context(), id, userID(c))
 	respond(c, row, err)
 }
 
@@ -508,9 +566,29 @@ func validateReferences(ctx context.Context, uid uint64, input proxy_route.Input
 	if !owned {
 		return errors.New("域名不属于当前用户")
 	}
+	domains, err := repository.ListZoneDomainsByIDs(ctx, input.ZoneDomainIDs)
+	if err != nil {
+		return err
+	}
+	for _, domain := range domains {
+		if domain.VerificationStatus != "verified" {
+			return errors.New("域名 " + domain.Domain + " 尚未完成 DNS TXT 所有权验证")
+		}
+		if !input.EnableHTTPS || domain.CertID == nil || *domain.CertID == 0 {
+			continue
+		}
+		if _, err := repository.GetOwnedTLSCertificateByID(ctx, *domain.CertID, uid); err != nil {
+			return errors.New("HTTPS 证书不属于当前用户")
+		}
+	}
 	if input.OriginID != nil {
 		if _, err := repository.GetOwnedOriginByID(ctx, *input.OriginID, uid); err != nil {
 			return errors.New("源站不属于当前用户")
+		}
+	}
+	if input.PagesProjectID != nil && *input.PagesProjectID != 0 {
+		if _, err := repository.GetPagesProjectByIDAndOwner(ctx, *input.PagesProjectID, uid); err != nil {
+			return errors.New("Pages 项目不属于当前用户")
 		}
 	}
 	return nil

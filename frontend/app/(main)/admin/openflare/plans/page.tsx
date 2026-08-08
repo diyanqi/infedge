@@ -254,7 +254,7 @@ export default function AdminPlansPage() {
             />
           </div>
           {numberField('每日发布次数，0不限', 'daily_publish_limit')}
-          {numberField('Zone 数量', 'max_zones')}
+          {numberField('域名分组数量', 'max_zones')}
           {numberField('源站数量', 'max_origins')}
           {numberField('规则数量', 'max_routes')}
           {numberField('Pages 数量', 'max_pages')}

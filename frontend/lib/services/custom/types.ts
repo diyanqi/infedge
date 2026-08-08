@@ -59,6 +59,10 @@ export interface ResourceZone {
   verification_status?: string;
   verification_token?: string;
 }
+export interface ResourceSite {
+  zone: ResourceZone;
+  domain: ResourceDomain;
+}
 export interface ResourceDomain {
   id: number;
   zone_id: number;
@@ -83,6 +87,7 @@ export interface ResourceRoute {
   origin_id: number | null;
   origin_url: string;
   upstream_list: string[];
+  upstream_weight_list?: number[];
   enabled: boolean;
   upstream_type: string;
   enable_https?: boolean;
@@ -91,6 +96,7 @@ export interface ResourceRoute {
   limit_req_per_ip?: string;
   cache_enabled?: boolean;
   cache_policy?: string;
+  cache_rule_list?: string[];
   origin_host?: string;
   limit_conn_per_server?: number;
   limit_conn_per_ip?: number;
@@ -104,7 +110,25 @@ export interface ResourceCertificate {
   name: string;
   remark?: string;
   provider?: string;
+  primary_domain?: string;
+  other_domains?: string;
   expires_at?: string | null;
+}
+
+export interface ResourcePagesProject {
+  id: number;
+  name: string;
+  slug: string;
+  enabled: boolean;
+  active_deployment_id?: number | null;
+}
+
+export interface DnsAccountItem {
+  id: number;
+  name: string;
+  type: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ResourcePolicy {

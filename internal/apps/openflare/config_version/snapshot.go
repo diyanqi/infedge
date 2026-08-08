@@ -48,6 +48,7 @@ type snapshotRoute struct {
 	OriginURL          string                           `json:"origin_url"`
 	OriginHost         string                           `json:"origin_host,omitempty"`
 	Upstreams          []string                         `json:"upstreams,omitempty"`
+	UpstreamWeights    []int                            `json:"upstream_weights,omitempty"`
 	Enabled            bool                             `json:"enabled"`
 	EnableHTTPS        bool                             `json:"enable_https"`
 	DomainCertIDs      []uint                           `json:"domain_cert_ids,omitempty"`
@@ -253,6 +254,10 @@ func buildSnapshotRoutes(ctx context.Context, routes []*model.ProxyRoute) ([]sna
 		if err != nil {
 			return nil, fmt.Errorf("路由 %s 上游配置无效", route.SiteName)
 		}
+		upstreamWeights, err := decodeStoredUpstreamWeights(route.UpstreamWeights, len(upstreams))
+		if err != nil {
+			return nil, fmt.Errorf("路由 %s 源站权重无效", route.SiteName)
+		}
 		var tunnelNodeID *uint
 		var tunnelTargetAddr string
 		var tunnelTargetProtocol string
@@ -283,6 +288,7 @@ func buildSnapshotRoutes(ctx context.Context, routes []*model.ProxyRoute) ([]sna
 			OriginURL:          originURL,
 			OriginHost:         route.OriginHost,
 			Upstreams:          upstreams,
+			UpstreamWeights:    upstreamWeights,
 			Enabled:            route.Enabled,
 			EnableHTTPS:        route.EnableHTTPS,
 			DomainCertIDs:      domainCertIDs,

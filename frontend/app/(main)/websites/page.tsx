@@ -63,15 +63,15 @@ export default function WebsitesPage() {
           onClick={() => setEditorOpen(true)}
         >
           <Plus className='mr-1 size-3.5' />
-          新增 Zone
+          添加域名
         </Button>
       </div>
 
       <div className='relative w-full sm:w-64'>
         <Search className='pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground' />
         <Input
-          aria-label='搜索 Zone 根域'
-          placeholder='搜索 Zone 根域'
+          aria-label='搜索域名分组'
+          placeholder='搜索域名分组'
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className='h-8 pl-8 text-xs'
@@ -97,7 +97,7 @@ export default function WebsitesPage() {
           description={
             search
               ? '未找到匹配的 Zone。'
-              : '暂无 Zone，点击右上角「新增 Zone」开始录入。'
+              : '暂无域名，点击右上角「添加域名」开始接入。'
           }
         />
       ) : (
@@ -110,7 +110,7 @@ export default function WebsitesPage() {
                     ID
                   </TableHead>
                   <TableHead className='h-8 min-w-[180px] whitespace-nowrap py-2'>
-                    根域
+                    域名分组
                   </TableHead>
                   <TableHead className='h-8 min-w-[100px] whitespace-nowrap py-2'>
                     域名数
@@ -181,7 +181,13 @@ export default function WebsitesPage() {
         </div>
       )}
 
-      <ZoneEditorDialog open={editorOpen} onOpenChange={setEditorOpen} />
+      <ZoneEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        onCreated={(site) => {
+          router.push(`/websites/${site.zone.id}?tab=domains`);
+        }}
+      />
     </div>
   );
 }

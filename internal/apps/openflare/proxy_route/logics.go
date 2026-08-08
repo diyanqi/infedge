@@ -33,6 +33,7 @@ type Input struct {
 	OriginURI            string              `json:"origin_uri"`
 	OriginHost           string              `json:"origin_host"`
 	Upstreams            []string            `json:"upstreams"`
+	UpstreamWeights      []int               `json:"upstream_weights"`
 	Enabled              bool                `json:"enabled"`
 	EnableHTTPS          bool                `json:"enable_https"`
 	RedirectHTTP         bool                `json:"redirect_http"`
@@ -66,6 +67,7 @@ type View struct {
 	OriginHost           string              `json:"origin_host"`
 	Upstreams            string              `json:"upstreams"`
 	UpstreamList         []string            `json:"upstream_list"`
+	UpstreamWeightList   []int               `json:"upstream_weight_list"`
 	Enabled              bool                `json:"enabled"`
 	EnableHTTPS          bool                `json:"enable_https"`
 	RedirectHTTP         bool                `json:"redirect_http"`
@@ -300,6 +302,10 @@ func buildProxyRoute(ctx context.Context, route *model.ProxyRoute, input Input) 
 	if err != nil {
 		return nil, nil, err
 	}
+	upstreamWeights, err := normalizeUpstreamWeights(len(upstreams), input.UpstreamWeights)
+	if err != nil {
+		return nil, nil, err
+	}
 	originHost := strings.TrimSpace(input.OriginHost)
 	cachePolicy := strings.TrimSpace(input.CachePolicy)
 	cacheRules, err := normalizeCacheRules(input.CacheEnabled, cachePolicy, input.CacheRules)
@@ -329,7 +335,7 @@ func buildProxyRoute(ctx context.Context, route *model.ProxyRoute, input Input) 
 	if err := validateProxyRouteZoneDomainCertificates(ctx, domains, input.EnableHTTPS); err != nil {
 		return nil, nil, err
 	}
-	jsonFields, err := marshalProxyRouteJSONFields(upstreams, cacheRules, customHeaders)
+	jsonFields, err := marshalProxyRouteJSONFields(upstreams, upstreamWeights, cacheRules, customHeaders)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -399,6 +405,10 @@ func buildProxyRouteView(ctx context.Context, route *model.ProxyRoute) (*View, e
 	if err != nil {
 		return nil, err
 	}
+	upstreamWeights, err := decodeStoredUpstreamWeights(route.UpstreamWeights, len(upstreams))
+	if err != nil {
+		return nil, err
+	}
 	cacheRules, err := decodeStoredCacheRules(route.CacheRules)
 	if err != nil {
 		return nil, err
@@ -423,6 +433,7 @@ func buildProxyRouteView(ctx context.Context, route *model.ProxyRoute) (*View, e
 		OriginHost:           route.OriginHost,
 		Upstreams:            route.Upstreams,
 		UpstreamList:         upstreams,
+		UpstreamWeightList:   upstreamWeights,
 		Enabled:              route.Enabled,
 		EnableHTTPS:          route.EnableHTTPS,
 		RedirectHTTP:         route.RedirectHTTP,

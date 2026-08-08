@@ -159,6 +159,7 @@ type Route struct {
 	OriginURL          string           `json:"origin_url"`
 	OriginHost         string           `json:"origin_host,omitempty"`
 	Upstreams          []string         `json:"upstreams,omitempty"`
+	UpstreamWeights    []int            `json:"upstream_weights,omitempty"`
 	Enabled            bool             `json:"enabled"`
 	EnableHTTPS        bool             `json:"enable_https"`
 	DomainCertIDs      []uint           `json:"domain_cert_ids,omitempty"`
@@ -353,6 +354,7 @@ type routeUpstreamConfig struct {
 	Scheme            string
 	ProxyPassURI      string
 	Servers           []string
+	Weights           []int
 	UsesNamedUpstream bool
 }
 
