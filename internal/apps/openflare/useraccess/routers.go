@@ -588,7 +588,7 @@ func validateReferences(ctx context.Context, uid uint64, input proxy_route.Input
 	}
 	if input.PagesProjectID != nil && *input.PagesProjectID != 0 {
 		if _, err := repository.GetPagesProjectByIDAndOwner(ctx, *input.PagesProjectID, uid); err != nil {
-			return errors.New("Pages 项目不属于当前用户")
+			return errors.New("pages 项目不属于当前用户")
 		}
 	}
 	return nil

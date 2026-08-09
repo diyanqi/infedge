@@ -372,6 +372,31 @@ func CreateDNSAccountHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response.OK(account))
 }
 
+// TestDNSAccountHandler 测试 DNS 账号凭据。
+// @Summary 测试 DNS 账号凭据
+// @Description 调用对应服务商只读 API 验证 DNS 账号凭据是否可用，需要管理员权限
+// @Tags openflare-tls
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param request body tls.DNSAccountInput true "DNS 账号参数"
+// @Success 200 {object} response.Any "测试成功"
+// @Failure 400 {object} response.Any "参数错误或测试失败"
+// @Failure 401 {object} response.Any "未登录"
+// @Failure 404 {object} response.Any "无权限或不存在"
+// @Failure 500 {object} response.Any "内部错误"
+// @Router /api/v1/d/dns-accounts/test [post]
+func TestDNSAccountHandler(c *gin.Context) {
+	var input DNSAccountInput
+	if !apiutil.BindJSON(c, &input) {
+		return
+	}
+	if err := TestDNSAccount(c.Request.Context(), input); handleLogicError(c, err) {
+		return
+	}
+	c.JSON(http.StatusOK, response.OKNil())
+}
+
 // UpdateDNSAccountHandler 更新 DNS 账号。
 // @Summary 更新 DNS 账号
 // @Description 按 ID 更新 DNS 提供商账号，需要管理员权限

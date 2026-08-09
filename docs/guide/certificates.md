@@ -22,7 +22,11 @@
 
 OpenFlare 内置了 ACME 客户端并对接了 **Asynq 异步任务队列**。通过配合云解析服务商的 DNS API，系统能自动完成 DNS-01 挑战（Challenge）校验，并向 CA（默认 Let's Encrypt）申请通配符/单域名证书，并在**到期前 30 天自动触发后台秒级续签**。
 
-### 第一步：在 Cloudflare 申请 DNS API Token
+### 第一步：准备 DNS 服务商凭据
+
+OpenFlare 支持 Cloudflare、阿里云、腾讯云 DNSPod 和华为云 DNS。不同服务商使用不同类型的 API 凭据，请按需准备：
+
+#### Cloudflare
 
 为了使 OpenFlare 能够自动在你的域名下添加 TXT 记录以完成 DNS 校验，你需要准备一个具有特定权限的 Cloudflare API Token。
 
@@ -42,15 +46,37 @@ OpenFlare 内置了 ACME 客户端并对接了 **Asynq 异步任务队列**。�
 6. 点击 **「继续以转到摘要 (Continue to summary)」**，确认无误后点击 **「创建令牌 (Create Token)」**。
 7. 复制生成的 **API 令牌 (Token)** 字符串。*注意：该令牌仅展示一次，请妥善保存*。
 
+#### 阿里云 DNS
+
+1. 登录 [阿里云 AccessKey 管理](https://ram.console.aliyun.com/manage/ak)，创建 AccessKey ID 与 AccessKey Secret。
+2. 建议创建 RAM 子用户并授予 `AliyunDNSFullAccess` 权限，避免使用主账号密钥。
+3. 云解析 DNS API 文档见 [阿里云云解析 DNS](https://help.aliyun.com/zh/alidns/)。
+
+#### 腾讯云 DNSPod
+
+1. 登录 [腾讯云 API 密钥管理](https://console.cloud.tencent.com/cam/capi)，创建 SecretId 与 SecretKey。
+2. 为密钥授予 DNSPod 相关权限，至少包含域名列表读取与 TXT 记录写入。
+3. DNSPod API 文档见 [腾讯云 DNSPod](https://cloud.tencent.com/document/product/1427)。
+
+#### 华为云 DNS
+
+1. 登录 [华为云 IAM](https://console.huaweicloud.com/iam)，创建 Access Key ID（AK）与 Secret Access Key（SK），并授予 DNS 管理权限。
+2. 记录账号所在区域（如 `cn-north-4`、`cn-east-3`）。
+3. DNS API 文档见 [华为云 DNS](https://support.huaweicloud.com/dns/)。
+
 ### 第二步：在控制端添加 DNS 账号
 
 1. 登录 OpenFlare 管理端，进入左侧导航 **「网站管理」->「DNS账号」**。
 2. 点击 **「添加账号」**。
 3. 填写配置信息：
    * **账号名称**：如 `cloudflare-main`。
-   * **DNS 服务商**：选择 `Cloudflare`。
-   * **API Token**：填入刚刚在 Cloudflare 复制的 API 令牌（该值在入库时会自动加密存储，保障安全）。
-4. 点击 **「保存」**。
+   * **DNS 服务商**：按你的实际服务商选择。
+   * **访问凭据**：按服务商填写对应字段，凭据在入库时会自动加密存储：
+     * Cloudflare：`API Token`
+     * 阿里云：`AccessKey ID`、`AccessKey Secret`，可选 `Security Token`、`Region ID`
+     * 腾讯云：`SecretId`、`SecretKey`，可选 `SessionToken`、`Region`
+     * 华为云：`Access Key ID (AK)`、`Secret Access Key (SK)`、`Region`
+4. 可先点击 **「测试连接」** 验证凭据是否有效，测试成功后点击 **「保存」**。
 
 ### 第三步：提交证书申请任务
 

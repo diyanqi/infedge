@@ -16,6 +16,7 @@ func registerTLSRoutes(group *gin.RouterGroup) {
 	group.GET("/tls-certificates", listUserCertificates)
 	group.GET("/tls-certificates/dns-accounts", listUserDNSAccounts)
 	group.GET("/dns-accounts", listUserOwnedDNSAccounts)
+	group.POST("/dns-accounts/test", testUserDNSAccount)
 	group.POST("/dns-accounts", createUserDNSAccount)
 	group.POST("/dns-accounts/:id/update", updateUserDNSAccount)
 	group.POST("/dns-accounts/:id/delete", deleteUserDNSAccount)
@@ -110,6 +111,25 @@ func createUserDNSAccount(c *gin.Context) {
 	}
 	row, err := tls.CreateOwnedDNSAccount(c.Request.Context(), userID(c), input)
 	certificateResult(c, row, err)
+}
+
+// testUserDNSAccount verifies DNS account credentials with the provider.
+// @Summary 测试我的 DNS 账号凭据
+// @Tags custom-resources
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body tls.DNSAccountInput true "DNS 账号参数"
+// @Success 200 {object} response.Any
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Router /api/v1/custom/resources/dns-accounts/test [post]
+func testUserDNSAccount(c *gin.Context) {
+	var input tls.DNSAccountInput
+	if !bind(c, &input) {
+		return
+	}
+	certificateResult(c, nil, tls.TestDNSAccount(c.Request.Context(), input))
 }
 
 // updateUserDNSAccount updates a DNS account owned by the current user.

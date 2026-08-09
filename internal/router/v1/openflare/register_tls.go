@@ -37,6 +37,7 @@ func registerTLSRoutes(apiGroup *gin.RouterGroup) {
 	{
 		apiutil.RegisterCollection(dnsAccountRoute, "GET", tls.GetDNSAccounts)
 		apiutil.RegisterCollection(dnsAccountRoute, "POST", tls.CreateDNSAccountHandler)
+		dnsAccountRoute.POST("/test", tls.TestDNSAccountHandler)
 		dnsAccountRoute.POST("/:id/update", tls.UpdateDNSAccountHandler)
 		dnsAccountRoute.POST("/:id/delete", tls.DeleteDNSAccountHandler)
 	}

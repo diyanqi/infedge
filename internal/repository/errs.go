@@ -25,3 +25,5 @@ const (
 const colName = "name"
 
 const colEnabled = "enabled"
+
+const colType = "type"

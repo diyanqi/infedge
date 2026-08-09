@@ -15,6 +15,15 @@ export {
 } from './zone.service';
 export { TlsCertificateService } from './tls-certificate.service';
 export { DnsAccountService } from './dns-account.service';
+export {
+  buildDnsAccountAuthorization,
+  DNS_ACCOUNT_CREDENTIALS,
+} from './dns-account-credentials';
+export type {
+  DnsAccountCredentialConfig,
+  DnsAccountCredentialField,
+  DnsAccountProviderType,
+} from './dns-account-credentials';
 export { PagesService } from './pages.service';
 export { OriginService } from './origin.service';
 export { AccessLogService } from './access-log.service';

@@ -21,6 +21,7 @@ import (
 
 const (
 	zoneVerificationStatusVerified = "verified"
+	zoneVerificationStatusPending  = "pending"
 	verificationTokenBytes         = 24
 )
 
@@ -101,7 +102,7 @@ func create(ctx context.Context, ownerID uint64, input Input) (*model.Zone, erro
 		Domain:             domain,
 		OwnerID:            ownerID,
 		ClaimsOwnership:    input.ClaimsOwnership,
-		VerificationStatus: "pending",
+		VerificationStatus: zoneVerificationStatusPending,
 		VerificationToken:  newVerificationToken(),
 	}
 	if err := repository.CreateZone(ctx, zone); err != nil {
@@ -235,7 +236,7 @@ func createSite(ctx context.Context, ownerID uint64, input SiteInput) (*Site, er
 			OwnerID:            ownerID,
 			Domain:             root,
 			ClaimsOwnership:    false,
-			VerificationStatus: "pending",
+			VerificationStatus: zoneVerificationStatusPending,
 			VerificationToken:  newVerificationToken(),
 		}
 		if err := repository.CreateZone(ctx, zone); err != nil {
@@ -339,7 +340,7 @@ func createDomain(ctx context.Context, zoneID uint, input DomainInput, inheritZo
 			return nil, errors.New(errCertificateNotFound)
 		}
 	}
-	status := "pending"
+	status := zoneVerificationStatusPending
 	var verifiedAt *time.Time
 	if inheritZoneOwnership && zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
 		status = zoneVerificationStatusVerified

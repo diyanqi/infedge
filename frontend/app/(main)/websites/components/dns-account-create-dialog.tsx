@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wifi } from 'lucide-react';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -25,17 +25,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { DnsAccountMutationPayload } from '@/lib/services/openflare';
 import { CustomDnsAccountService } from '@/lib/services/custom';
-import { DnsAccountService } from '@/lib/services/openflare';
+import type {
+  DnsAccountMutationPayload,
+  DnsAccountProviderType,
+} from '@/lib/services/openflare';
+import {
+  buildDnsAccountAuthorization,
+  DNS_ACCOUNT_CREDENTIALS,
+  DnsAccountService,
+} from '@/lib/services/openflare';
 
 import { getErrorMessage } from './website-utils';
 
-const dnsAccountSchema = z.object({
-  name: z.string().trim().min(1, '请输入名称').max(255),
-  type: z.string().min(1),
-  authorization: z.string().trim().min(1, '请输入 Token'),
-});
+const dnsAccountSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, '请输入名称')
+      .max(255, '名称不能超过 255 个字符'),
+    type: z.string().min(1),
+    credentials: z.record(z.string(), z.string()),
+  })
+  .superRefine((value, context) => {
+    const config =
+      DNS_ACCOUNT_CREDENTIALS[value.type as DnsAccountProviderType];
+    if (!config) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['type'],
+        message: '请选择 DNS 服务商',
+      });
+      return;
+    }
+    for (const field of config.fields) {
+      if (field.required && !value.credentials[field.key]?.trim()) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['credentials', field.key],
+          message: `请填写${field.label}`,
+        });
+      }
+    }
+  });
 
 type DnsAccountFormValues = z.infer<typeof dnsAccountSchema>;
 
@@ -54,6 +87,8 @@ export function DnsAccountCreateDialog({
 }: DnsAccountCreateDialogProps) {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
+  const [testError, setTestError] = useState('');
+  const [testSuccess, setTestSuccess] = useState('');
   const dnsAccountsQueryKey =
     mode === 'admin'
       ? ['openflare', 'dns-accounts']
@@ -62,8 +97,14 @@ export function DnsAccountCreateDialog({
     mode === 'admin' ? DnsAccountService : CustomDnsAccountService;
   const form = useForm<DnsAccountFormValues>({
     resolver: zodResolver(dnsAccountSchema),
-    defaultValues: { name: '', type: 'cloudflare', authorization: '' },
+    defaultValues: {
+      name: '',
+      type: 'cloudflare',
+      credentials: { api_token: '' },
+    },
   });
+  const watchedType = form.watch('type') as DnsAccountProviderType;
+  const credentialConfig = DNS_ACCOUNT_CREDENTIALS[watchedType];
 
   const createMutation = useMutation({
     mutationFn: (payload: DnsAccountMutationPayload) =>
@@ -72,24 +113,59 @@ export function DnsAccountCreateDialog({
       await queryClient.invalidateQueries({ queryKey: dnsAccountsQueryKey });
       form.reset();
       setError('');
+      setTestError('');
+      setTestSuccess('');
       onCreated?.();
       onOpenChange(false);
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
 
+  const testMutation = useMutation({
+    mutationFn: (payload: DnsAccountMutationPayload) =>
+      createService.test(payload),
+    onSuccess: () => {
+      setTestSuccess('连接成功，凭据有效');
+      setTestError('');
+    },
+    onError: (err) => {
+      setTestError(getErrorMessage(err));
+      setTestSuccess('');
+    },
+  });
+
+  const buildPayload = (
+    values: DnsAccountFormValues,
+  ): DnsAccountMutationPayload => ({
+    name: values.name.trim(),
+    type: values.type,
+    authorization: buildDnsAccountAuthorization(
+      values.type,
+      values.credentials,
+    ),
+  });
+
   const onSubmit = form.handleSubmit((values) => {
     setError('');
-    let auth = values.authorization.trim();
-    if (!auth.startsWith('{')) {
-      auth = JSON.stringify({ api_token: values.authorization });
-    }
-    createMutation.mutate({ ...values, authorization: auth });
+    createMutation.mutate(buildPayload(values));
   });
+
+  const handleTest = form.handleSubmit((values) => {
+    setTestError('');
+    setTestSuccess('');
+    testMutation.mutate(buildPayload(values));
+  });
+
+  const handleProviderChange = (value: string) => {
+    form.setValue('type', value);
+    form.setValue('credentials', {});
+  };
 
   const handleClose = () => {
     form.reset();
     setError('');
+    setTestError('');
+    setTestSuccess('');
     onOpenChange(false);
   };
 
@@ -105,6 +181,12 @@ export function DnsAccountCreateDialog({
 
         <form className='space-y-4' onSubmit={onSubmit}>
           {error ? <p className='text-sm text-destructive'>{error}</p> : null}
+          {testError ? (
+            <p className='text-sm text-destructive'>{testError}</p>
+          ) : null}
+          {testSuccess ? (
+            <p className='text-sm text-emerald-600'>{testSuccess}</p>
+          ) : null}
 
           <div className='space-y-2'>
             <Label>账号名称</Label>
@@ -123,38 +205,73 @@ export function DnsAccountCreateDialog({
             <Label>DNS 服务商</Label>
             <Select
               value={form.watch('type')}
-              onValueChange={(value) => form.setValue('type', value)}
+              onValueChange={handleProviderChange}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='cloudflare'>Cloudflare</SelectItem>
-                <SelectItem value='aliyun'>阿里云 DNS</SelectItem>
-                <SelectItem value='tencent'>腾讯云 DNSPod</SelectItem>
-                <SelectItem value='huawei'>华为云 DNS</SelectItem>
+                {Object.values(DNS_ACCOUNT_CREDENTIALS).map((config) => (
+                  <SelectItem key={config.provider} value={config.provider}>
+                    {config.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className='space-y-2'>
-            <Label>访问凭据 JSON 或 Token</Label>
-            <Input
-              {...form.register('authorization')}
-              placeholder='Cloudflare 可填 Token；其他厂商请填 JSON 凭据'
-            />
-            {form.formState.errors.authorization ? (
+            {form.formState.errors.type ? (
               <p className='text-xs text-destructive'>
-                {form.formState.errors.authorization.message}
+                {form.formState.errors.type.message}
               </p>
             ) : null}
+          </div>
+
+          <div className='space-y-3'>
+            {credentialConfig?.fields.map((field) => (
+              <div className='space-y-2' key={field.key}>
+                <Label>{field.label}</Label>
+                <Input
+                  type={field.type ?? 'text'}
+                  placeholder={field.placeholder}
+                  {...form.register(`credentials.${field.key}`)}
+                />
+                {field.help ? (
+                  <p className='text-xs text-muted-foreground'>{field.help}</p>
+                ) : null}
+                {form.formState.errors.credentials?.[field.key]?.message ? (
+                  <p className='text-xs text-destructive'>
+                    {form.formState.errors.credentials[field.key]?.message}
+                  </p>
+                ) : null}
+              </div>
+            ))}
           </div>
 
           <DialogFooter>
             <Button type='button' variant='outline' onClick={handleClose}>
               取消
             </Button>
-            <Button type='submit' disabled={createMutation.isPending}>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => void handleTest()}
+              disabled={testMutation.isPending || createMutation.isPending}
+            >
+              {testMutation.isPending ? (
+                <>
+                  <Loader2 className='mr-1 size-3.5 animate-spin' />
+                  测试中...
+                </>
+              ) : (
+                <>
+                  <Wifi className='mr-1 size-3.5' />
+                  测试连接
+                </>
+              )}
+            </Button>
+            <Button
+              type='submit'
+              disabled={createMutation.isPending || testMutation.isPending}
+            >
               {createMutation.isPending ? (
                 <>
                   <Loader2 className='mr-1 size-3.5 animate-spin' />

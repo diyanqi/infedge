@@ -89,7 +89,7 @@ func SaveOwnedTLSCertificate(ctx context.Context, certificate *model.TLSCertific
 	result := conn.Model(&model.TLSCertificate{}).
 		Where("id = ? AND owner_id = ?", certificate.ID, ownerID).
 		Updates(map[string]any{
-			"name":            certificate.Name,
+			colName:           certificate.Name,
 			"cert_pem":        certificate.CertPEM,
 			"key_pem":         certificate.KeyPEM,
 			"not_before":      certificate.NotBefore,

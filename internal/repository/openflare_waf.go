@@ -103,7 +103,7 @@ func UpdateOpenFlareWAFRuleGroup(ctx context.Context, group *model.OpenFlareWAFR
 		return err
 	}
 	return conn.Model(&model.OpenFlareWAFRuleGroup{}).Where("id = ?", group.ID).Updates(map[string]any{
-		"name":      group.Name,
+		colName:     group.Name,
 		"host":      group.Host,
 		"owner_id":  group.OwnerID,
 		colEnabled:  group.Enabled,
@@ -118,7 +118,7 @@ func UpdateOpenFlareWAFRuleGroupForOwner(ctx context.Context, group *model.OpenF
 		return err
 	}
 	return conn.Model(&model.OpenFlareWAFRuleGroup{}).Where("id = ? AND owner_id = ? AND is_global = ?", group.ID, ownerID, false).
-		Updates(map[string]any{"name": group.Name, "host": group.Host, colEnabled: group.Enabled}).Error
+		Updates(map[string]any{colName: group.Name, "host": group.Host, colEnabled: group.Enabled}).Error
 }
 
 // UpdateOpenFlareWAFRuleGraph atomically replaces a graph when revision is current.
@@ -207,7 +207,7 @@ func UpdateOpenFlareWAFIPGroup(ctx context.Context, group *model.OpenFlareWAFIPG
 	}
 	return conn.Model(&model.OpenFlareWAFIPGroup{}).Where("id = ?", group.ID).Updates(map[string]any{
 		colName:                     group.Name,
-		"type":                      group.Type,
+		colType:                     group.Type,
 		colEnabled:                  group.Enabled,
 		"ip_list":                   group.IPList,
 		"auto_config":               group.AutoConfig,

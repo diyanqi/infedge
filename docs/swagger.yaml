@@ -1100,6 +1100,8 @@ definitions:
         type: integer
       name:
         type: string
+      owner_id:
+        type: integer
       type:
         type: string
       updated_at:
@@ -1578,6 +1580,8 @@ definitions:
         type: string
       other_domains:
         type: string
+      owner_id:
+        type: integer
       primary_domain:
         type: string
       provider:
@@ -1777,6 +1781,8 @@ definitions:
     type: object
   model.Zone:
     properties:
+      claims_ownership:
+        type: boolean
       created_at:
         type: string
       domain:
@@ -1786,6 +1792,12 @@ definitions:
       owner_id:
         type: integer
       updated_at:
+        type: string
+      verification_status:
+        type: string
+      verification_token:
+        type: string
+      verified_at:
         type: string
     type: object
   model.ZoneDomain:
@@ -1801,6 +1813,12 @@ definitions:
       proxy_route_id:
         type: integer
       updated_at:
+        type: string
+      verification_status:
+        type: string
+      verification_token:
+        type: string
+      verified_at:
         type: string
       zone_id:
         type: integer
@@ -3176,6 +3194,10 @@ definitions:
         type: string
       upstream_type:
         type: string
+      upstream_weights:
+        items:
+          type: integer
+        type: array
       upstreams:
         items:
           type: string
@@ -3253,6 +3275,10 @@ definitions:
         type: array
       upstream_type:
         type: string
+      upstream_weight_list:
+        items:
+          type: integer
+        type: array
       upstreams:
         type: string
       zone_domain_ids:
@@ -4167,6 +4193,8 @@ definitions:
     type: object
   waf.CreateRuleInput:
     properties:
+      host:
+        type: string
       name:
         type: string
     type: object
@@ -4371,12 +4399,16 @@ definitions:
         type: boolean
       graph:
         $ref: '#/definitions/waf.RuleGraph'
+      host:
+        type: string
       id:
         type: integer
       is_global:
         type: boolean
       name:
         type: string
+      owner_id:
+        type: integer
       revision:
         type: integer
       updated_at:
@@ -4412,6 +4444,8 @@ definitions:
     properties:
       enabled:
         type: boolean
+      host:
+        type: string
       name:
         type: string
     type: object
@@ -4424,6 +4458,8 @@ definitions:
     type: object
   zone.Input:
     properties:
+      claims_ownership:
+        type: boolean
       domain:
         type: string
     type: object
@@ -4448,6 +4484,18 @@ definitions:
         type: array
       zone:
         $ref: '#/definitions/model.Zone'
+    type: object
+  zone.Site:
+    properties:
+      domain:
+        $ref: '#/definitions/model.ZoneDomain'
+      zone:
+        $ref: '#/definitions/model.Zone'
+    type: object
+  zone.SiteInput:
+    properties:
+      domain:
+        type: string
     type: object
   zone.Stats:
     properties:
@@ -7836,6 +7884,174 @@ paths:
       summary: 兑换套餐码
       tags:
       - custom-subscription
+  /api/v1/custom/resources/dns-accounts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.DNSAccount'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 DNS 账号
+      tags:
+      - custom-resources
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: DNS 账号参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.DNSAccountInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.DNSAccount'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建我的 DNS 账号
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/dns-accounts/{id}/delete:
+    post:
+      parameters:
+      - description: DNS 账号 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除我的 DNS 账号
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/dns-accounts/{id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: DNS 账号 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: DNS 账号参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.DNSAccountInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.DNSAccount'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的 DNS 账号
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/dns-accounts/test:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: DNS 账号参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.DNSAccountInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 测试我的 DNS 账号凭据
+      tags:
+      - custom-resources
   /api/v1/custom/resources/origins:
     get:
       produces:
@@ -8162,6 +8378,541 @@ paths:
       summary: 发布全站配置
       tags:
       - custom-resources
+  /api/v1/custom/resources/sites:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 域名参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.SiteInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/zone.Site'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 直接创建我的 CDN 域名
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/sites/{id}/verify:
+    post:
+      parameters:
+      - description: 域名 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ZoneDomain'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 验证我的 CDN 域名
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.TLSCertificate'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 TLS 证书
+      tags:
+      - custom-resources
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 证书参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.CertificateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 创建我的 TLS 证书
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}:
+    get:
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 TLS 证书详情
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/content:
+    get:
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/tls.CertificateContent'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取我的 TLS 证书内容
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/convert-acme:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 申请参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.ApplyInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 转换我的 TLS 证书为 ACME
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/delete:
+    post:
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 删除我的 TLS 证书
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/renew:
+    post:
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 续期我的 ACME 证书
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 证书参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.CertificateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的 TLS 证书
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/{id}/update-acme:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 证书 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 申请参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.ApplyInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的 ACME 证书配置
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/acme-account/default:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AcmeAccount'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取默认 ACME 账号
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/apply:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 申请参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tls.ApplyInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 申请我的 ACME 证书
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/dns-accounts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.DNSAccount'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 获取可用 DNS 账号（平台 + 我的）
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/tls-certificates/import-file:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 证书名称
+        in: formData
+        name: name
+        type: string
+      - description: 备注
+        in: formData
+        name: remark
+        type: string
+      - description: 证书文件
+        in: formData
+        name: cert_file
+        required: true
+        type: file
+      - description: 私钥文件
+        in: formData
+        name: key_file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TLSCertificate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 导入我的 TLS 证书
+      tags:
+      - custom-resources
   /api/v1/custom/resources/zones:
     get:
       produces:
@@ -8326,6 +9077,56 @@ paths:
       security:
       - SessionCookie: []
       summary: 添加我的域名
+      tags:
+      - custom-resources
+  /api/v1/custom/resources/zones/{id}/domains/{domain_id}/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 域名 ID
+        in: path
+        name: domain_id
+        required: true
+        type: integer
+      - description: 域名参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.DomainInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ZoneDomain'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 更新我的子域配置
       tags:
       - custom-resources
   /api/v1/custom/resources/zones/{id}/update:
@@ -9524,6 +10325,46 @@ paths:
       security:
       - SessionCookie: []
       summary: 更新 DNS 账号
+      tags:
+      - openflare-tls
+  /api/v1/d/dns-accounts/test:
+    post:
+      consumes:
+      - application/json
+      description: 调用对应服务商只读 API 验证 DNS 账号凭据是否可用，需要管理员权限
+      parameters:
+      - description: DNS 账号参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/tls.DNSAccountInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 测试成功
+          schema:
+            $ref: '#/definitions/response.Any'
+        "400":
+          description: 参数错误或测试失败
+          schema:
+            $ref: '#/definitions/response.Any'
+        "401":
+          description: 未登录
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: 无权限或不存在
+          schema:
+            $ref: '#/definitions/response.Any'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 测试 DNS 账号凭据
       tags:
       - openflare-tls
   /api/v1/d/node-groups:
@@ -11439,6 +12280,75 @@ paths:
       summary: 更新代理规则
       tags:
       - openflare-proxy-route
+  /api/v1/d/sites:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 域名参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zone.SiteInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/zone.Site'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 直接创建 CDN 域名
+      tags:
+      - openflare-zone
+  /api/v1/d/sites/{id}/verify:
+    post:
+      parameters:
+      - description: 域名 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Any'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ZoneDomain'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+      security:
+      - SessionCookie: []
+      summary: 验证 CDN 域名所有权
+      tags:
+      - openflare-zone
   /api/v1/d/status:
     get:
       description: 返回版本、认证源与系统公开配置，无需登录

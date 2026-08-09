@@ -130,8 +130,8 @@ func SaveOwnedDNSAccount(ctx context.Context, account *model.DNSAccount, ownerID
 	result := conn.Model(&model.DNSAccount{}).
 		Where("id = ? AND owner_id = ?", account.ID, ownerID).
 		Updates(map[string]any{
-			"name":          account.Name,
-			"type":          account.Type,
+			colName:         account.Name,
+			colType:         account.Type,
 			"authorization": account.Authorization,
 		})
 	if result.Error != nil {

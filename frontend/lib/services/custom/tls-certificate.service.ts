@@ -40,6 +40,7 @@ export interface TlsCertificateApi {
 export interface DnsAccountApi {
   list(): Promise<DnsAccountItem[]>;
   create(payload: DnsAccountMutationPayload): Promise<DnsAccountItem>;
+  test(payload: DnsAccountMutationPayload): Promise<void>;
   update(
     id: number,
     payload: DnsAccountMutationPayload,
@@ -136,6 +137,10 @@ export class CustomDnsAccountService extends BaseService {
 
   static create(payload: DnsAccountMutationPayload): Promise<DnsAccountItem> {
     return this.post<DnsAccountItem>('', payload);
+  }
+
+  static test(payload: DnsAccountMutationPayload): Promise<void> {
+    return this.post<void>('/test', payload);
   }
 
   static update(

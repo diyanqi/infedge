@@ -69,16 +69,16 @@ export default function ConfigurePage() {
       }
     });
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainQueries, zones.data]);
 
   const selectedZone = useMemo(
     () => (zones.data ?? []).find((zone) => zone.id === selectedZoneId) ?? null,
     [selectedZoneId, zones.data],
   );
-  const zoneDomains = selectedZone
-    ? (domainsByZone.get(selectedZone.id) ?? [])
-    : [];
+  const zoneDomains = useMemo(
+    () => (selectedZone ? (domainsByZone.get(selectedZone.id) ?? []) : []),
+    [selectedZone, domainsByZone],
+  );
 
   useEffect(() => {
     if (requestedDomainId > 0) {

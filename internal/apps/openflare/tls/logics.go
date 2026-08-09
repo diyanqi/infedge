@@ -447,17 +447,9 @@ func ListDNSAccounts(ctx context.Context) ([]model.DNSAccount, error) {
 
 // CreateDNSAccount 创建 DNS 账号。
 func CreateDNSAccount(ctx context.Context, input DNSAccountInput) (*model.DNSAccount, error) {
-	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	account, err := buildDNSAccount(0, input)
 	if err != nil {
 		return nil, err
-	}
-	account := &model.DNSAccount{
-		Name:          strings.TrimSpace(input.Name),
-		Type:          strings.TrimSpace(input.Type),
-		Authorization: authorization,
-	}
-	if account.Name == "" || account.Type == "" || authorization == "" {
-		return nil, errors.New("DNS 账号参数不完整")
 	}
 	if err := repository.CreateDNSAccountRecord(ctx, account); err != nil {
 		return nil, err
@@ -471,16 +463,13 @@ func UpdateDNSAccount(ctx context.Context, id uint, input DNSAccountInput) (*mod
 	if err != nil {
 		return nil, err
 	}
-	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	built, err := buildDNSAccount(0, input)
 	if err != nil {
 		return nil, err
 	}
-	account.Name = strings.TrimSpace(input.Name)
-	account.Type = strings.TrimSpace(input.Type)
-	account.Authorization = authorization
-	if account.Name == "" || account.Type == "" || authorization == "" {
-		return nil, errors.New("DNS 账号参数不完整")
-	}
+	account.Name = built.Name
+	account.Type = built.Type
+	account.Authorization = built.Authorization
 	if err := repository.SaveDNSAccount(ctx, account); err != nil {
 		return nil, err
 	}
@@ -521,18 +510,9 @@ func CreateOwnedDNSAccount(ctx context.Context, ownerID uint64, input DNSAccount
 	if count >= maxUserDNSAccounts {
 		return nil, errors.New(errDNSAccountLimit)
 	}
-	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	account, err := buildDNSAccount(ownerID, input)
 	if err != nil {
 		return nil, err
-	}
-	account := &model.DNSAccount{
-		OwnerID:       ownerID,
-		Name:          strings.TrimSpace(input.Name),
-		Type:          strings.TrimSpace(input.Type),
-		Authorization: authorization,
-	}
-	if account.Name == "" || account.Type == "" || authorization == "" {
-		return nil, errors.New("DNS 账号参数不完整")
 	}
 	if err := repository.CreateDNSAccountRecord(ctx, account); err != nil {
 		return nil, err
@@ -546,16 +526,13 @@ func UpdateOwnedDNSAccount(ctx context.Context, id uint, ownerID uint64, input D
 	if err != nil {
 		return nil, err
 	}
-	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	built, err := buildDNSAccount(ownerID, input)
 	if err != nil {
 		return nil, err
 	}
-	account.Name = strings.TrimSpace(input.Name)
-	account.Type = strings.TrimSpace(input.Type)
-	account.Authorization = authorization
-	if account.Name == "" || account.Type == "" || authorization == "" {
-		return nil, errors.New("DNS 账号参数不完整")
-	}
+	account.Name = built.Name
+	account.Type = built.Type
+	account.Authorization = built.Authorization
 	if err := repository.SaveOwnedDNSAccount(ctx, account, ownerID); err != nil {
 		return nil, err
 	}

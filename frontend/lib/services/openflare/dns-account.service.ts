@@ -22,6 +22,10 @@ export class DnsAccountService extends OpenFlareBaseService {
     return this.post<DnsAccountItem>(`/${id}/update`, payload);
   }
 
+  static async test(payload: DnsAccountMutationPayload): Promise<void> {
+    return this.post<void>('/test', payload);
+  }
+
   static async deleteById(id: number): Promise<void> {
     return this.post<void>(`/${id}/delete`);
   }

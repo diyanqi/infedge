@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Settings2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Plus, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 
