@@ -53,6 +53,61 @@ func DeleteZone(ctx context.Context, id uint) error {
 	return db.DB(ctx).Delete(&model.Zone{}, id).Error
 }
 
+// DeleteOwnedZoneCascade removes an owned zone together with all of its explicit
+// domains, and deletes any proxy route that becomes orphaned (used by the
+// ordinary-user console where a "site" is the domain itself).
+func DeleteOwnedZoneCascade(ctx context.Context, zoneID uint, ownerID uint64) error {
+	return WithProxyRouteTx(ctx, func(tx *gorm.DB) error {
+		var domains []model.ZoneDomain
+		if err := tx.Where("zone_id = ?", zoneID).Find(&domains).Error; err != nil {
+			return err
+		}
+		routeIDs := make(map[uint]struct{}, len(domains))
+		for _, domain := range domains {
+			if domain.ProxyRouteID != nil {
+				routeIDs[*domain.ProxyRouteID] = struct{}{}
+			}
+		}
+		if len(domains) > 0 {
+			if err := tx.Model(&model.ZoneDomain{}).
+				Where("zone_id = ?", zoneID).
+				Update("proxy_route_id", nil).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("zone_id = ?", zoneID).Delete(&model.ZoneDomain{}).Error; err != nil {
+				return err
+			}
+		}
+		zoneResult := tx.Where("id = ? AND owner_id = ?", zoneID, ownerID).Delete(&model.Zone{})
+		if zoneResult.Error != nil {
+			return zoneResult.Error
+		}
+		if zoneResult.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		for routeID := range routeIDs {
+			var remaining int64
+			if err := tx.Model(&model.ZoneDomain{}).Where("proxy_route_id = ?", routeID).Count(&remaining).Error; err != nil {
+				return err
+			}
+			if remaining > 0 {
+				continue
+			}
+			routeResult := tx.Where("id = ? AND owner_id = ?", routeID, ownerID).Delete(&model.ProxyRoute{})
+			if routeResult.Error != nil {
+				return routeResult.Error
+			}
+			if routeResult.RowsAffected == 0 {
+				continue
+			}
+			if err := tx.Where("proxy_route_id = ?", routeID).Delete(&model.OpenFlareWAFRuleGroupBinding{}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // ListZoneDomainCounts returns per-zone domain counts for list cards.
 func ListZoneDomainCounts(ctx context.Context) ([]model.ZoneDomainCount, error) {
 	var rows []model.ZoneDomainCount

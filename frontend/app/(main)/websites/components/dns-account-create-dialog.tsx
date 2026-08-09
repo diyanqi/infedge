@@ -26,11 +26,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { DnsAccountMutationPayload } from '@/lib/services/openflare';
+import { CustomDnsAccountService } from '@/lib/services/custom';
 import { DnsAccountService } from '@/lib/services/openflare';
 
 import { getErrorMessage } from './website-utils';
-
-const dnsAccountsQueryKey = ['openflare', 'dns-accounts'];
 
 const dnsAccountSchema = z.object({
   name: z.string().trim().min(1, '请输入名称').max(255),
@@ -44,15 +43,23 @@ interface DnsAccountCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  mode?: 'admin' | 'user';
 }
 
 export function DnsAccountCreateDialog({
   open,
   onOpenChange,
   onCreated,
+  mode = 'admin',
 }: DnsAccountCreateDialogProps) {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
+  const dnsAccountsQueryKey =
+    mode === 'admin'
+      ? ['openflare', 'dns-accounts']
+      : ['custom', 'dns-accounts'];
+  const createService =
+    mode === 'admin' ? DnsAccountService : CustomDnsAccountService;
   const form = useForm<DnsAccountFormValues>({
     resolver: zodResolver(dnsAccountSchema),
     defaultValues: { name: '', type: 'cloudflare', authorization: '' },
@@ -60,7 +67,7 @@ export function DnsAccountCreateDialog({
 
   const createMutation = useMutation({
     mutationFn: (payload: DnsAccountMutationPayload) =>
-      DnsAccountService.create(payload),
+      createService.create(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: dnsAccountsQueryKey });
       form.reset();

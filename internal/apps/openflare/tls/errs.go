@@ -18,4 +18,5 @@ const (
 	errCertificatePEMInvalid        = "证书 PEM 内容不合法"
 
 	errDNSAccountInUse = "该 DNS 账号已被证书使用，无法删除"
+	errDNSAccountLimit = "每个用户最多创建 5 个 DNS 账号"
 )

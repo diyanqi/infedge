@@ -2,6 +2,7 @@ import { BaseService } from '@/lib/services/core';
 import type {
   AcmeAccountItem,
   DnsAccountItem,
+  DnsAccountMutationPayload,
   TlsCertificateApplyPayload,
   TlsCertificateContentItem,
   TlsCertificateDetailItem,
@@ -38,6 +39,12 @@ export interface TlsCertificateApi {
 
 export interface DnsAccountApi {
   list(): Promise<DnsAccountItem[]>;
+  create(payload: DnsAccountMutationPayload): Promise<DnsAccountItem>;
+  update(
+    id: number,
+    payload: DnsAccountMutationPayload,
+  ): Promise<DnsAccountItem>;
+  deleteById(id: number): Promise<void>;
 }
 
 export class CustomTlsCertificateService extends BaseService {
@@ -115,9 +122,30 @@ export class CustomTlsCertificateService extends BaseService {
 
 export class CustomDnsAccountService extends BaseService {
   protected static override readonly basePath =
-    '/api/v1/custom/resources/tls-certificates/dns-accounts';
+    '/api/v1/custom/resources/dns-accounts';
 
+  /** 平台账号 + 我的账号（ACME 申请可选列表）。 */
   static list(): Promise<DnsAccountItem[]> {
+    return this.get<DnsAccountItem[]>('/tls-certificates/dns-accounts');
+  }
+
+  /** 仅我的账号（DNS 账号管理页）。 */
+  static listOwned(): Promise<DnsAccountItem[]> {
     return this.get<DnsAccountItem[]>('');
+  }
+
+  static create(payload: DnsAccountMutationPayload): Promise<DnsAccountItem> {
+    return this.post<DnsAccountItem>('', payload);
+  }
+
+  static update(
+    id: number,
+    payload: DnsAccountMutationPayload,
+  ): Promise<DnsAccountItem> {
+    return this.post<DnsAccountItem>(`/${id}/update`, payload);
+  }
+
+  static deleteById(id: number): Promise<void> {
+    return this.post<void>(`/${id}/delete`);
   }
 }

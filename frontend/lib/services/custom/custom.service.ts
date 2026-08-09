@@ -144,6 +144,9 @@ export class CustomService extends BaseService {
   static listRoutes(): Promise<ResourceRoute[]> {
     return this.get('/resources/proxy-routes');
   }
+  static getRoute(id: number): Promise<ResourceRoute> {
+    return this.get(`/resources/proxy-routes/${id}`);
+  }
   static createRoute(payload: Record<string, unknown>): Promise<ResourceRoute> {
     return this.post('/resources/proxy-routes', payload);
   }

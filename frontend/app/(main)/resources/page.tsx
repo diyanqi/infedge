@@ -313,9 +313,15 @@ function PendingDomainRow({ domain }: { domain: ResourceDomain }) {
         </div>
       </div>
       <Button variant='outline' size='sm' asChild>
-        <Link href={`/resources/configure?domain=${domain.id}`}>
+        <Link
+          href={
+            verified
+              ? `/resources/detail?domain=${domain.id}`
+              : `/resources/configure?domain=${domain.id}`
+          }
+        >
           <ArrowRight data-icon='inline-start' />
-          {verified ? '配置域名' : '验证所有权'}
+          {verified ? '进入站点控制台' : '验证所有权'}
         </Link>
       </Button>
     </div>

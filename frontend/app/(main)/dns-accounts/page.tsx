@@ -26,6 +26,8 @@ import {
 import { EmptyStateWithBorder } from '@/components/layout/empty';
 import { ErrorInline } from '@/components/layout/error';
 import { LoadingStateWithBorder } from '@/components/layout/loading';
+import { useUser } from '@/contexts/user-context';
+import { CustomDnsAccountService } from '@/lib/services/custom';
 import type { DnsAccountItem } from '@/lib/services/openflare';
 import { DnsAccountService } from '@/lib/services/openflare';
 import { formatDateTime } from '@/lib/utils';
@@ -33,20 +35,28 @@ import { formatDateTime } from '@/lib/utils';
 import { DnsAccountCreateDialog } from '../websites/components/dns-account-create-dialog';
 import { getErrorMessage } from '../websites/components/website-utils';
 
-const dnsAccountsQueryKey = ['openflare', 'dns-accounts'];
-
 export default function DnsAccountsPage() {
+  const { user, loading: userLoading } = useUser();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DnsAccountItem | null>(null);
+  const isAdmin = Boolean(user?.is_admin);
+  const dnsAccountService = isAdmin
+    ? DnsAccountService
+    : CustomDnsAccountService;
+  const dnsAccountsQueryKey = isAdmin
+    ? ['openflare', 'dns-accounts']
+    : ['custom', 'dns-accounts'];
 
   const dnsAccountsQuery = useQuery({
     queryKey: dnsAccountsQueryKey,
-    queryFn: () => DnsAccountService.list(),
+    queryFn: () =>
+      isAdmin ? DnsAccountService.list() : CustomDnsAccountService.listOwned(),
+    enabled: !userLoading && Boolean(user),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => DnsAccountService.deleteById(id),
+    mutationFn: (id: number) => dnsAccountService.deleteById(id),
     onSuccess: async () => {
       toast.success('DNS 账号已删除');
       setDeleteTarget(null);
@@ -59,6 +69,7 @@ export default function DnsAccountsPage() {
     () => dnsAccountsQuery.data ?? [],
     [dnsAccountsQuery.data],
   );
+  const reachedUserLimit = !isAdmin && accounts.length >= 5;
 
   return (
     <div className='py-6 px-1 space-y-6'>
@@ -72,9 +83,10 @@ export default function DnsAccountsPage() {
             size='sm'
             className='h-7 text-xs'
             onClick={() => setCreateOpen(true)}
+            disabled={reachedUserLimit}
           >
             <Plus className='size-3.5 mr-1' />
-            添加账号
+            {reachedUserLimit ? '已达 5 个上限' : '添加账号'}
           </Button>
         </div>
       </div>
@@ -86,6 +98,7 @@ export default function DnsAccountsPage() {
           </CardTitle>
           <CardDescription>
             统一管理 DNS 服务商账号，用于 ACME 证书的 DNS 验证申请。
+            {isAdmin ? '' : ' 每个用户最多 5 个。'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -144,6 +157,7 @@ export default function DnsAccountsPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => toast.success('DNS 账号已添加')}
+        mode={isAdmin ? 'admin' : 'user'}
       />
 
       <AlertDialog

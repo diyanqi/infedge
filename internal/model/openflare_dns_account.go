@@ -10,6 +10,7 @@ import (
 // DNSAccount OpenFlare DNS 账号实体。
 type DNSAccount struct {
 	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	OwnerID       uint64    `json:"owner_id" gorm:"not null;default:0;index"`
 	Name          string    `json:"name" gorm:"size:255;not null"`
 	Type          string    `json:"type" gorm:"size:64;not null"`
 	Authorization string    `json:"-" gorm:"type:text;not null"`

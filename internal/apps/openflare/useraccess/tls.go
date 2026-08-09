@@ -15,6 +15,10 @@ import (
 func registerTLSRoutes(group *gin.RouterGroup) {
 	group.GET("/tls-certificates", listUserCertificates)
 	group.GET("/tls-certificates/dns-accounts", listUserDNSAccounts)
+	group.GET("/dns-accounts", listUserOwnedDNSAccounts)
+	group.POST("/dns-accounts", createUserDNSAccount)
+	group.POST("/dns-accounts/:id/update", updateUserDNSAccount)
+	group.POST("/dns-accounts/:id/delete", deleteUserDNSAccount)
 	group.POST("/tls-certificates", createUserCertificate)
 	group.POST("/tls-certificates/apply", applyUserCertificate)
 	group.POST("/tls-certificates/import-file", importUserCertificateFile)
@@ -62,8 +66,8 @@ func listUserCertificates(c *gin.Context) {
 	certificateResult(c, rows, err)
 }
 
-// listUserDNSAccounts lists administrator-configured DNS accounts for ACME use.
-// @Summary 获取可用 DNS 账号
+// listUserDNSAccounts lists platform and user-owned DNS accounts for ACME use.
+// @Summary 获取可用 DNS 账号（平台 + 我的）
 // @Tags custom-resources
 // @Produce json
 // @Security SessionCookie
@@ -71,8 +75,86 @@ func listUserCertificates(c *gin.Context) {
 // @Failure 401 {object} response.Any
 // @Router /api/v1/custom/resources/tls-certificates/dns-accounts [get]
 func listUserDNSAccounts(c *gin.Context) {
-	rows, err := tls.ListDNSAccounts(c.Request.Context())
+	rows, err := tls.ListDNSAccountsForOwner(c.Request.Context(), userID(c))
 	certificateResult(c, rows, err)
+}
+
+// listUserOwnedDNSAccounts lists DNS accounts owned by the current user.
+// @Summary 获取我的 DNS 账号
+// @Tags custom-resources
+// @Produce json
+// @Security SessionCookie
+// @Success 200 {object} response.Any{data=[]model.DNSAccount}
+// @Failure 401 {object} response.Any
+// @Router /api/v1/custom/resources/dns-accounts [get]
+func listUserOwnedDNSAccounts(c *gin.Context) {
+	rows, err := tls.ListOwnedDNSAccounts(c.Request.Context(), userID(c))
+	certificateResult(c, rows, err)
+}
+
+// createUserDNSAccount creates a DNS account owned by the current user (max 5).
+// @Summary 创建我的 DNS 账号
+// @Tags custom-resources
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param body body tls.DNSAccountInput true "DNS 账号参数"
+// @Success 200 {object} response.Any{data=model.DNSAccount}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Router /api/v1/custom/resources/dns-accounts [post]
+func createUserDNSAccount(c *gin.Context) {
+	var input tls.DNSAccountInput
+	if !bind(c, &input) {
+		return
+	}
+	row, err := tls.CreateOwnedDNSAccount(c.Request.Context(), userID(c), input)
+	certificateResult(c, row, err)
+}
+
+// updateUserDNSAccount updates a DNS account owned by the current user.
+// @Summary 更新我的 DNS 账号
+// @Tags custom-resources
+// @Accept json
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "DNS 账号 ID"
+// @Param body body tls.DNSAccountInput true "DNS 账号参数"
+// @Success 200 {object} response.Any{data=model.DNSAccount}
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Failure 404 {object} response.Any
+// @Router /api/v1/custom/resources/dns-accounts/{id}/update [post]
+func updateUserDNSAccount(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var input tls.DNSAccountInput
+	if !bind(c, &input) {
+		return
+	}
+	row, err := tls.UpdateOwnedDNSAccount(c.Request.Context(), id, userID(c), input)
+	certificateResult(c, row, err)
+}
+
+// deleteUserDNSAccount deletes a DNS account owned by the current user.
+// @Summary 删除我的 DNS 账号
+// @Tags custom-resources
+// @Produce json
+// @Security SessionCookie
+// @Param id path int true "DNS 账号 ID"
+// @Success 200 {object} response.Any
+// @Failure 400 {object} response.Any
+// @Failure 401 {object} response.Any
+// @Failure 404 {object} response.Any
+// @Router /api/v1/custom/resources/dns-accounts/{id}/delete [post]
+func deleteUserDNSAccount(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	certificateResult(c, nil, tls.DeleteOwnedDNSAccount(c.Request.Context(), id, userID(c)))
 }
 
 // createUserCertificate creates an uploaded certificate owned by the current user.

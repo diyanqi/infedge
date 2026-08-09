@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Cloud,
   FileKey,
   FileText,
   Gauge,
@@ -109,6 +110,7 @@ export const ordinaryUserNav: OpenFlareNavItem[] = [
     childUrls: ['/pages/detail'],
   },
   { title: '证书', url: '/certificates', icon: FileKey },
+  { title: 'DNS 账号', url: '/dns-accounts', icon: Cloud },
   { title: '套餐与用量', url: '/plans', icon: Package },
 ];
 

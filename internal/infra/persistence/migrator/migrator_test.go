@@ -99,6 +99,9 @@ func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 	if !sqliteDB.Migrator().HasColumn(&model.ProxyRoute{}, "upstream_weights") {
 		t.Error("Migrate() did not add of_proxy_routes.upstream_weights")
 	}
+	if !sqliteDB.Migrator().HasColumn(&model.DNSAccount{}, "owner_id") {
+		t.Error("Migrate() did not add of_dns_accounts.owner_id")
+	}
 	channel := model.PaymentChannel{
 		Name: "test", Gateway: "https://pay.example.com", PID: "10001", SecretKey: "secret",
 	}

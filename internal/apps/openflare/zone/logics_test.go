@@ -21,7 +21,8 @@ func setupZoneDB(t *testing.T) context.Context {
 	t.Helper()
 	conn, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
-	require.NoError(t, conn.AutoMigrate(&model.Zone{}, &model.ZoneDomain{}, &model.TLSCertificate{}))
+	require.NoError(t, conn.AutoMigrate(&model.Zone{}, &model.ZoneDomain{}, &model.TLSCertificate{},
+		&model.ProxyRoute{}, &model.OpenFlareWAFRuleGroupBinding{}))
 	db.SetDB(conn)
 	t.Cleanup(func() { db.SetDB(nil) })
 	return context.Background()
@@ -141,4 +142,77 @@ func TestGetStatsAggregatesZoneHosts(t *testing.T) {
 
 	_, err = GetStats(ctx, zone.ID, "1h")
 	require.EqualError(t, err, errStatsRangeInvalid)
+}
+
+func TestDeleteOwnedCascadesZoneDomainsAndRoutes(t *testing.T) {
+	ctx := setupZoneDB(t)
+	site, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "maomao.com"})
+	require.NoError(t, err)
+
+	route := &model.ProxyRoute{
+		OwnerID:         42,
+		SiteName:        "maomao",
+		Upstreams:       "[]",
+		UpstreamWeights: "[]",
+		CacheRules:      "[]",
+		CustomHeaders:   "[]",
+		Enabled:         true,
+	}
+	require.NoError(t, repository.CreateProxyRouteRecord(ctx, route))
+	routeID := route.ID
+	domain := site.Domain
+	domain.ProxyRouteID = &routeID
+	require.NoError(t, repository.SaveZoneDomain(ctx, &domain))
+	require.NoError(t, db.DB(ctx).Create(&model.OpenFlareWAFRuleGroupBinding{
+		RuleGroupID: 1, ProxyRouteID: routeID,
+	}).Error)
+
+	require.NoError(t, DeleteOwned(ctx, site.Zone.ID, 42))
+
+	_, err = repository.GetZoneByID(ctx, site.Zone.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = repository.GetZoneDomainByZoneAndID(ctx, site.Zone.ID, domain.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = repository.GetProxyRouteByID(ctx, routeID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	var bindings int64
+	require.NoError(t, db.DB(ctx).Model(&model.OpenFlareWAFRuleGroupBinding{}).
+		Where("proxy_route_id = ?", routeID).Count(&bindings).Error)
+	require.Zero(t, bindings)
+}
+
+func TestDeleteOwnedKeepsRouteBoundToOtherZoneDomain(t *testing.T) {
+	ctx := setupZoneDB(t)
+	first, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "maomao.com"})
+	require.NoError(t, err)
+	second, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "example.com"})
+	require.NoError(t, err)
+
+	route := &model.ProxyRoute{
+		OwnerID:         42,
+		SiteName:        "multi",
+		Upstreams:       "[]",
+		UpstreamWeights: "[]",
+		CacheRules:      "[]",
+		CustomHeaders:   "[]",
+		Enabled:         true,
+	}
+	require.NoError(t, repository.CreateProxyRouteRecord(ctx, route))
+	routeID := route.ID
+	firstDomain := first.Domain
+	firstDomain.ProxyRouteID = &routeID
+	require.NoError(t, repository.SaveZoneDomain(ctx, &firstDomain))
+	secondDomain := second.Domain
+	secondDomain.ProxyRouteID = &routeID
+	require.NoError(t, repository.SaveZoneDomain(ctx, &secondDomain))
+
+	require.NoError(t, DeleteOwned(ctx, first.Zone.ID, 42))
+
+	_, err = repository.GetProxyRouteByID(ctx, routeID)
+	require.NoError(t, err)
+	domains, err := repository.ListZoneDomainsByRouteID(ctx, routeID)
+	require.NoError(t, err)
+	require.Len(t, domains, 1)
+	require.Equal(t, secondDomain.ID, domains[0].ID)
 }

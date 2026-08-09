@@ -18,6 +18,8 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/model"
 )
 
+const maxUserDNSAccounts = 5
+
 // CertificateInput TLS 证书创建/更新请求。
 type CertificateInput struct {
 	Name    string `json:"name"`
@@ -276,6 +278,9 @@ func applyCertificate(ctx context.Context, ownerID uint64, input ApplyInput) (*m
 	if cert.Name == "" {
 		return nil, errors.New(errCertificateNameRequired)
 	}
+	if err := ensureDNSAccountAccessible(ctx, ownerID, input.DNSAccountID); err != nil {
+		return nil, err
+	}
 	if err := repository.CreateTLSCertificateRecord(ctx, cert); err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, errors.New(errCertificateNameExists)
@@ -312,6 +317,9 @@ func UpdateACMECertificateOwned(ctx context.Context, id uint, ownerID uint64, in
 func updateACMECertificate(ctx context.Context, cert *model.TLSCertificate, input ApplyInput, ownerID uint64) (*model.TLSCertificate, error) {
 	if cert.Provider != tlsProviderACME {
 		return nil, errors.New(errCertificateOnlyACME)
+	}
+	if err := ensureDNSAccountAccessible(ctx, ownerID, input.DNSAccountID); err != nil {
+		return nil, err
 	}
 	fillAcmeCertificateFields(cert, input)
 	if cert.Name == "" {
@@ -357,6 +365,9 @@ func convertCertificateToACME(ctx context.Context, cert *model.TLSCertificate, i
 	}
 	if cert.ApplyStatus == tlsApplyStatusApplying {
 		return nil, errors.New(errCertificateAlreadyApplying)
+	}
+	if err := ensureDNSAccountAccessible(ctx, ownerID, input.DNSAccountID); err != nil {
+		return nil, err
 	}
 	fillAcmeCertificateFields(cert, input)
 	if cert.Name == "" {
@@ -454,9 +465,9 @@ func CreateDNSAccount(ctx context.Context, input DNSAccountInput) (*model.DNSAcc
 	return sanitizeDNSAccountForResponse(account), nil
 }
 
-// UpdateDNSAccount 更新 DNS 账号。
+// UpdateDNSAccount 更新平台级 DNS 账号。
 func UpdateDNSAccount(ctx context.Context, id uint, input DNSAccountInput) (*model.DNSAccount, error) {
-	account, err := repository.GetDNSAccountByID(ctx, id)
+	account, err := repository.GetPlatformDNSAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -476,9 +487,9 @@ func UpdateDNSAccount(ctx context.Context, id uint, input DNSAccountInput) (*mod
 	return sanitizeDNSAccountForResponse(account), nil
 }
 
-// DeleteDNSAccount 删除 DNS 账号。
+// DeleteDNSAccount 删除平台级 DNS 账号。
 func DeleteDNSAccount(ctx context.Context, id uint) error {
-	if _, err := repository.GetDNSAccountByID(ctx, id); err != nil {
+	if _, err := repository.GetPlatformDNSAccountByID(ctx, id); err != nil {
 		return err
 	}
 	count, err := repository.CountTLSCertificatesByDNSAccountID(ctx, id)
@@ -489,6 +500,96 @@ func DeleteDNSAccount(ctx context.Context, id uint) error {
 		return errors.New(errDNSAccountInUse)
 	}
 	return repository.DeleteDNSAccountRecord(ctx, id)
+}
+
+// ListOwnedDNSAccounts 列出某个普通用户自己的 DNS 账号。
+func ListOwnedDNSAccounts(ctx context.Context, ownerID uint64) ([]model.DNSAccount, error) {
+	return repository.ListOwnedDNSAccounts(ctx, ownerID)
+}
+
+// ListDNSAccountsForOwner 返回平台账号与当前用户自己的账号，供 ACME 申请选择。
+func ListDNSAccountsForOwner(ctx context.Context, ownerID uint64) ([]model.DNSAccount, error) {
+	return repository.ListDNSAccountsForOwner(ctx, ownerID)
+}
+
+// CreateOwnedDNSAccount 创建普通用户自己的 DNS 账号，最多 5 个。
+func CreateOwnedDNSAccount(ctx context.Context, ownerID uint64, input DNSAccountInput) (*model.DNSAccount, error) {
+	count, err := repository.CountOwnedDNSAccounts(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if count >= maxUserDNSAccounts {
+		return nil, errors.New(errDNSAccountLimit)
+	}
+	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	if err != nil {
+		return nil, err
+	}
+	account := &model.DNSAccount{
+		OwnerID:       ownerID,
+		Name:          strings.TrimSpace(input.Name),
+		Type:          strings.TrimSpace(input.Type),
+		Authorization: authorization,
+	}
+	if account.Name == "" || account.Type == "" || authorization == "" {
+		return nil, errors.New("DNS 账号参数不完整")
+	}
+	if err := repository.CreateDNSAccountRecord(ctx, account); err != nil {
+		return nil, err
+	}
+	return sanitizeDNSAccountForResponse(account), nil
+}
+
+// UpdateOwnedDNSAccount 更新普通用户自己的 DNS 账号。
+func UpdateOwnedDNSAccount(ctx context.Context, id uint, ownerID uint64, input DNSAccountInput) (*model.DNSAccount, error) {
+	account, err := repository.GetOwnedDNSAccountByID(ctx, id, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	authorization, err := sealSensitive(strings.TrimSpace(input.Authorization))
+	if err != nil {
+		return nil, err
+	}
+	account.Name = strings.TrimSpace(input.Name)
+	account.Type = strings.TrimSpace(input.Type)
+	account.Authorization = authorization
+	if account.Name == "" || account.Type == "" || authorization == "" {
+		return nil, errors.New("DNS 账号参数不完整")
+	}
+	if err := repository.SaveOwnedDNSAccount(ctx, account, ownerID); err != nil {
+		return nil, err
+	}
+	return sanitizeDNSAccountForResponse(account), nil
+}
+
+// DeleteOwnedDNSAccount 删除普通用户自己的 DNS 账号。
+func DeleteOwnedDNSAccount(ctx context.Context, id uint, ownerID uint64) error {
+	if _, err := repository.GetOwnedDNSAccountByID(ctx, id, ownerID); err != nil {
+		return err
+	}
+	count, err := repository.CountTLSCertificatesByDNSAccountID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New(errDNSAccountInUse)
+	}
+	return repository.DeleteOwnedDNSAccountRecord(ctx, id, ownerID)
+}
+
+// ensureDNSAccountAccessible 校验普通用户只能使用平台账号或自己的 DNS 账号。
+func ensureDNSAccountAccessible(ctx context.Context, ownerID uint64, dnsAccountID uint) error {
+	if ownerID == 0 || dnsAccountID == 0 {
+		return nil
+	}
+	account, err := repository.GetDNSAccountByID(ctx, dnsAccountID)
+	if err != nil {
+		return err
+	}
+	if account.OwnerID != 0 && account.OwnerID != ownerID {
+		return errors.New("DNS 账号不属于当前用户")
+	}
+	return nil
 }
 
 // GetDefaultAcmeAccount 获取默认 ACME 账号。

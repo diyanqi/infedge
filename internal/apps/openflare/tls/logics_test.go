@@ -134,3 +134,63 @@ func TestCreateCertificateEncryptsPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, strings.TrimSpace(keyPEM), strings.TrimSpace(content.KeyPEM))
 }
+
+func TestCreateOwnedDNSAccountEnforcesFiveLimit(t *testing.T) {
+	cleanup := setupTLSTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	for i := 0; i < maxUserDNSAccounts; i++ {
+		account, err := CreateOwnedDNSAccount(ctx, 100, DNSAccountInput{
+			Name:          "cloudflare-" + string(rune('a'+i)),
+			Type:          "cloudflare",
+			Authorization: `{"api_token":"token-"}`,
+		})
+		require.NoError(t, err)
+		require.Equal(t, uint64(100), account.OwnerID)
+	}
+
+	_, err := CreateOwnedDNSAccount(ctx, 100, DNSAccountInput{
+		Name:          "overflow",
+		Type:          "cloudflare",
+		Authorization: `{"api_token":"token"}`,
+	})
+	require.EqualError(t, err, errDNSAccountLimit)
+
+	// 其他用户不受影响，仍可创建自己的账号。
+	account, err := CreateOwnedDNSAccount(ctx, 200, DNSAccountInput{
+		Name:          "another-user",
+		Type:          "aliyun",
+		Authorization: `{"access_key_id":"id","access_key_secret":"secret"}`,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(200), account.OwnerID)
+}
+
+func TestOwnedDNSAccountScopedToOwner(t *testing.T) {
+	cleanup := setupTLSTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	account, err := CreateOwnedDNSAccount(ctx, 100, DNSAccountInput{
+		Name:          "my-account",
+		Type:          "cloudflare",
+		Authorization: `{"api_token":"token"}`,
+	})
+	require.NoError(t, err)
+
+	_, err = UpdateOwnedDNSAccount(ctx, account.ID, 200, DNSAccountInput{
+		Name:          "hijack",
+		Type:          "cloudflare",
+		Authorization: `{"api_token":"other"}`,
+	})
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	err = DeleteOwnedDNSAccount(ctx, account.ID, 200)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	rows, err := ListOwnedDNSAccounts(ctx, 100)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, account.ID, rows[0].ID)
+}

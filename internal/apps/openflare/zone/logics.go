@@ -276,12 +276,11 @@ func UpdateOwned(ctx context.Context, id uint, userID uint64, input Input) (*mod
 	return zone, err
 }
 
-// DeleteOwned deletes an owned zone.
+// DeleteOwned deletes an owned zone together with its domains and the sites
+// (proxy routes) bound to those domains. Ordinary users manage "sites" by
+// domain, so a root domain group can be removed in one action.
 func DeleteOwned(ctx context.Context, id uint, userID uint64) error {
-	if _, err := repository.GetOwnedZoneByID(ctx, id, userID); err != nil {
-		return err
-	}
-	return Delete(ctx, id)
+	return repository.DeleteOwnedZoneCascade(ctx, id, userID)
 }
 
 // CreateOwnedDomain creates a domain under an owned zone.
