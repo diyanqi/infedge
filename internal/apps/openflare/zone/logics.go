@@ -98,12 +98,14 @@ func create(ctx context.Context, ownerID uint64, input Input) (*model.Zone, erro
 	if err != nil || root != domain {
 		return nil, errors.New(errZoneRootInvalid)
 	}
+	status, verifiedAt := verificationState(ownerID)
 	zone := &model.Zone{
 		Domain:             domain,
 		OwnerID:            ownerID,
 		ClaimsOwnership:    input.ClaimsOwnership,
-		VerificationStatus: zoneVerificationStatusPending,
+		VerificationStatus: status,
 		VerificationToken:  newVerificationToken(),
+		VerifiedAt:         verifiedAt,
 	}
 	if err := repository.CreateZone(ctx, zone); err != nil {
 		if isUnique(err) {
@@ -230,14 +232,19 @@ func createSite(ctx context.Context, ownerID uint64, input SiteInput) (*Site, er
 	if err != nil {
 		return nil, errors.New(errDomainInvalid)
 	}
+	if err := ensureDomainNotBound(ctx, domain, nil); err != nil {
+		return nil, err
+	}
 	zone, err := repository.GetZoneByDomainAndOwner(ctx, root, ownerID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		status, verifiedAt := verificationState(ownerID)
 		zone = &model.Zone{
 			OwnerID:            ownerID,
 			Domain:             root,
 			ClaimsOwnership:    false,
-			VerificationStatus: zoneVerificationStatusPending,
+			VerificationStatus: status,
 			VerificationToken:  newVerificationToken(),
+			VerifiedAt:         verifiedAt,
 		}
 		if err := repository.CreateZone(ctx, zone); err != nil {
 			if isUnique(err) {
@@ -248,7 +255,7 @@ func createSite(ctx context.Context, ownerID uint64, input SiteInput) (*Site, er
 	} else if err != nil {
 		return nil, err
 	}
-	domainItem, err := createDomain(ctx, zone.ID, DomainInput{Domain: domain}, false)
+	domainItem, err := createDomain(ctx, zone.ID, DomainInput{Domain: domain}, false, ownerID == 0)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +296,7 @@ func CreateOwnedDomain(ctx context.Context, zoneID uint, userID uint64, input Do
 	if _, err := repository.GetOwnedZoneByID(ctx, zoneID, userID); err != nil {
 		return nil, err
 	}
-	return CreateDomain(ctx, zoneID, input)
+	return createDomain(ctx, zoneID, input, true, false)
 }
 
 // UpdateOwnedDomain updates a domain and keeps all ownership checks in the
@@ -319,10 +326,10 @@ func GetOverview(ctx context.Context, id uint) (*Overview, error) {
 
 // CreateDomain adds a validated exact hostname to a Zone.
 func CreateDomain(ctx context.Context, zoneID uint, input DomainInput) (*model.ZoneDomain, error) {
-	return createDomain(ctx, zoneID, input, true)
+	return createDomain(ctx, zoneID, input, true, true)
 }
 
-func createDomain(ctx context.Context, zoneID uint, input DomainInput, inheritZoneOwnership bool) (*model.ZoneDomain, error) {
+func createDomain(ctx context.Context, zoneID uint, input DomainInput, inheritZoneOwnership, autoVerified bool) (*model.ZoneDomain, error) {
 	zone, err := repository.GetZoneByID(ctx, zoneID)
 	if err != nil {
 		return nil, err
@@ -340,9 +347,12 @@ func createDomain(ctx context.Context, zoneID uint, input DomainInput, inheritZo
 			return nil, errors.New(errCertificateNotFound)
 		}
 	}
+	if err := ensureDomainNotBound(ctx, domain, nil); err != nil {
+		return nil, err
+	}
 	status := zoneVerificationStatusPending
 	var verifiedAt *time.Time
-	if inheritZoneOwnership && zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified {
+	if autoVerified || (inheritZoneOwnership && zone.ClaimsOwnership && zone.VerificationStatus == zoneVerificationStatusVerified) {
 		status = zoneVerificationStatusVerified
 		now := time.Now().UTC()
 		verifiedAt = &now
@@ -416,8 +426,10 @@ func VerifyOwnedSiteDomain(ctx context.Context, domainID uint, ownerID uint64) (
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyTXT(ctx, "_openflare-verification."+domain.Domain, domain.VerificationToken); err != nil {
-		return nil, err
+	if ownerID != 0 {
+		if err := verifyTXT(ctx, "_openflare-verification."+domain.Domain, domain.VerificationToken); err != nil {
+			return nil, err
+		}
 	}
 	now := time.Now().UTC()
 	domain.VerificationStatus, domain.VerifiedAt = zoneVerificationStatusVerified, &now
@@ -453,6 +465,14 @@ func newVerificationToken() string {
 		return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
 	}
 	return hex.EncodeToString(buf)
+}
+
+func verificationState(ownerID uint64) (string, *time.Time) {
+	if ownerID != 0 {
+		return zoneVerificationStatusPending, nil
+	}
+	now := time.Now().UTC()
+	return zoneVerificationStatusVerified, &now
 }
 
 func verifyTXT(ctx context.Context, name, expected string) error {
@@ -499,6 +519,9 @@ func UpdateDomain(ctx context.Context, zoneID, id uint, input DomainInput) (*mod
 			return nil, errors.New(errCertificateNotFound)
 		}
 	}
+	if err := ensureDomainNotBound(ctx, domain, []uint{item.ID}); err != nil {
+		return nil, err
+	}
 	item.Domain, item.CertID = domain, input.CertID
 	if err = repository.SaveZoneDomain(ctx, item); err != nil {
 		if isUnique(err) {
@@ -507,6 +530,17 @@ func UpdateDomain(ctx context.Context, zoneID, id uint, input DomainInput) (*mod
 		return nil, err
 	}
 	return item, nil
+}
+
+func ensureDomainNotBound(ctx context.Context, domain string, excludeIDs []uint) error {
+	_, err := repository.GetBoundZoneDomainByDomain(ctx, domain, excludeIDs)
+	if err == nil {
+		return errors.New(errDomainInUse)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return nil
 }
 
 // DeleteDomain removes a Zone domain that is not bound to a proxy route.

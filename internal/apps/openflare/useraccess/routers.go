@@ -107,6 +107,7 @@ func ListZones(c *gin.Context) {
 // @Success 200 {object} response.Any{data=model.Zone}
 // @Failure 400 {object} response.Any
 // @Failure 401 {object} response.Any
+// @Failure 409 {object} response.Any
 // @Router /api/v1/custom/resources/zones [post]
 func CreateZone(c *gin.Context) {
 	ctx, id := c.Request.Context(), userID(c)
@@ -137,6 +138,7 @@ func CreateZone(c *gin.Context) {
 // @Success 200 {object} response.Any{data=zone.Site}
 // @Failure 400 {object} response.Any
 // @Failure 401 {object} response.Any
+// @Failure 409 {object} response.Any
 // @Router /api/v1/custom/resources/sites [post]
 func CreateSite(c *gin.Context) {
 	ctx, uid := c.Request.Context(), userID(c)
@@ -214,6 +216,7 @@ func GetZone(c *gin.Context) {
 // @Failure 400 {object} response.Any
 // @Failure 401 {object} response.Any
 // @Failure 404 {object} response.Any
+// @Failure 409 {object} response.Any
 // @Router /api/v1/custom/resources/zones/{id}/update [post]
 func UpdateZone(c *gin.Context) {
 	id, ok := parseID(c)
@@ -258,6 +261,7 @@ func DeleteZone(c *gin.Context) {
 // @Failure 400 {object} response.Any
 // @Failure 401 {object} response.Any
 // @Failure 404 {object} response.Any
+// @Failure 409 {object} response.Any
 // @Router /api/v1/custom/resources/zones/{id}/domains [post]
 func CreateDomain(c *gin.Context) {
 	id, ok := parseID(c)
@@ -291,6 +295,7 @@ func CreateDomain(c *gin.Context) {
 // @Failure 400 {object} response.Any
 // @Failure 401 {object} response.Any
 // @Failure 404 {object} response.Any
+// @Failure 409 {object} response.Any
 // @Router /api/v1/custom/resources/zones/{id}/domains/{domain_id}/update [post]
 func UpdateDomain(c *gin.Context) {
 	zoneID, ok := parseID(c)
@@ -611,9 +616,12 @@ func bind(c *gin.Context, target any) bool {
 }
 func respond(c *gin.Context, data any, err error) {
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
 			response.AbortNotFound(c, "资源不存在")
-		} else {
+		case zone.IsConflict(err):
+			response.AbortConflict(c, err.Error())
+		default:
 			response.AbortBadRequest(c, err.Error())
 		}
 		return

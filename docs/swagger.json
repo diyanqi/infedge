@@ -6487,6 +6487,12 @@
                         "schema": {
                             "$ref": "#/definitions/response.Any"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
                     }
                 }
             }
@@ -7441,6 +7447,12 @@
                         "schema": {
                             "$ref": "#/definitions/response.Any"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
                     }
                 }
             }
@@ -7618,6 +7630,12 @@
                         "schema": {
                             "$ref": "#/definitions/response.Any"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
                     }
                 }
             }
@@ -7700,6 +7718,12 @@
                         "schema": {
                             "$ref": "#/definitions/response.Any"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
                     }
                 }
             }
@@ -7772,6 +7796,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Any"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/response.Any"
                         }

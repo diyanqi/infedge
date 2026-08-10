@@ -276,7 +276,16 @@ func loadProxyRouteZoneDomains(ctx context.Context, ids []uint) ([]model.ZoneDom
 	if err != nil {
 		return nil, errors.New(errProxyRouteZoneDomainNotFound)
 	}
+	zoneOwners, err := repository.ListZoneDomainOwners(ctx, ids)
+	if err != nil {
+		return nil, errors.New(errProxyRouteZoneDomainNotFound)
+	}
 	for _, domain := range domains {
+		// Admin-managed zones never require TXT ownership verification,
+		// including legacy rows created before admin zones were auto-verified.
+		if owner, ok := zoneOwners[domain.ID]; ok && owner == 0 {
+			continue
+		}
 		// Empty status is retained for legacy rows created before verification
 		// fields existed; newly onboarded rows use pending until TXT succeeds.
 		if domain.VerificationStatus != "" && domain.VerificationStatus != "verified" {

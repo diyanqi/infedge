@@ -8409,6 +8409,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Any'
       security:
       - SessionCookie: []
       summary: 直接创建我的 CDN 域名
@@ -8968,6 +8972,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Any'
       security:
       - SessionCookie: []
       summary: 创建我的 Zone
@@ -9074,6 +9082,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Any'
       security:
       - SessionCookie: []
       summary: 添加我的域名
@@ -9124,6 +9136,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Any'
       security:
       - SessionCookie: []
       summary: 更新我的子域配置
@@ -9167,6 +9183,10 @@ paths:
             $ref: '#/definitions/response.Any'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/response.Any'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/response.Any'
       security:

@@ -15,8 +15,8 @@ const (
 // Zone OpenFlare 注册根域实体。
 type Zone struct {
 	ID                 uint       `json:"id" gorm:"primaryKey;autoIncrement"`
-	OwnerID            uint64     `json:"owner_id" gorm:"not null;default:0;index"`
-	Domain             string     `json:"domain" gorm:"uniqueIndex:idx_of_zones_domain;size:255;not null"`
+	OwnerID            uint64     `json:"owner_id" gorm:"not null;default:0;index;uniqueIndex:idx_of_zones_owner_domain,priority:2"`
+	Domain             string     `json:"domain" gorm:"uniqueIndex:idx_of_zones_owner_domain,priority:1;size:255;not null"`
 	ClaimsOwnership    bool       `json:"claims_ownership" gorm:"not null;default:false"`
 	VerificationStatus string     `json:"verification_status" gorm:"size:32;not null;default:'pending'"`
 	VerificationToken  string     `json:"verification_token,omitempty" gorm:"size:128;not null;default:''"`
@@ -33,9 +33,9 @@ func (Zone) TableName() string {
 // ZoneDomain OpenFlare Zone 下的明确域名实体。
 type ZoneDomain struct {
 	ID                 uint       `json:"id" gorm:"primaryKey;autoIncrement"`
-	ZoneID             uint       `json:"zone_id" gorm:"not null;index:idx_of_zone_domains_zone_id"`
+	ZoneID             uint       `json:"zone_id" gorm:"not null;index:idx_of_zone_domains_zone_id;uniqueIndex:idx_of_zone_domains_zone_domain,priority:1"`
 	ProxyRouteID       *uint      `json:"proxy_route_id" gorm:"index:idx_of_zone_domains_proxy_route_id"`
-	Domain             string     `json:"domain" gorm:"uniqueIndex:idx_of_zone_domains_domain;size:255;not null"`
+	Domain             string     `json:"domain" gorm:"uniqueIndex:idx_of_zone_domains_zone_domain,priority:2;size:255;not null"`
 	CertID             *uint      `json:"cert_id" gorm:"index:idx_of_zone_domains_cert_id"`
 	VerificationStatus string     `json:"verification_status" gorm:"size:32;not null;default:'pending'"`
 	VerificationToken  string     `json:"verification_token,omitempty" gorm:"size:128;not null;default:''"`

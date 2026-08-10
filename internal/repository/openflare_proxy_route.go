@@ -128,6 +128,9 @@ func ReplaceZoneDomainRouteBindingsTx(tx *gorm.DB, routeID uint, domainIDs []uin
 				return ErrZoneDomainBoundToAnotherRoute
 			}
 		}
+		if err := ensureSameNameDomainsNotBoundToOtherRoute(tx, routeID, requested); err != nil {
+			return err
+		}
 	}
 
 	current := tx.Model(&model.ZoneDomain{}).Where("proxy_route_id = ?", routeID)
@@ -142,6 +145,35 @@ func ReplaceZoneDomainRouteBindingsTx(tx *gorm.DB, routeID uint, domainIDs []uin
 		return nil
 	}
 	return tx.Model(&model.ZoneDomain{}).Where("id IN ?", domainIDs).Update("proxy_route_id", routeID).Error
+}
+
+// ensureSameNameDomainsNotBoundToOtherRoute rejects a binding when the same
+// hostname already exists in another Zone and belongs to a different route.
+// Locking every same-name row keeps concurrent route mutations from racing.
+func ensureSameNameDomainsNotBoundToOtherRoute(tx *gorm.DB, routeID uint, requested []model.ZoneDomain) error {
+	names := make([]string, 0, len(requested))
+	for _, domain := range requested {
+		names = append(names, domain.Domain)
+	}
+	var sameName []model.ZoneDomain
+	if err := tx.Clauses(clause.Locking{Strength: pagesRowLockStrength}).
+		Where("domain IN ?", names).
+		Find(&sameName).Error; err != nil {
+		return err
+	}
+	requestedIDs := make(map[uint]struct{}, len(requested))
+	for _, domain := range requested {
+		requestedIDs[domain.ID] = struct{}{}
+	}
+	for _, domain := range sameName {
+		if _, isRequested := requestedIDs[domain.ID]; isRequested {
+			continue
+		}
+		if domain.ProxyRouteID != nil && *domain.ProxyRouteID != routeID {
+			return ErrZoneDomainBoundToAnotherRoute
+		}
+	}
+	return nil
 }
 
 // DeleteProxyRouteAndUnbind clears domain bindings then deletes the proxy route in one transaction.

@@ -57,16 +57,70 @@ func TestCreateSiteRequiresExplicitDomain(t *testing.T) {
 	require.EqualError(t, err, errSiteDomainRequired)
 }
 
-func TestCreateSiteRequiresDomainVerificationForClaimedZone(t *testing.T) {
+func TestAdminAndUserCanShareRootZoneAndDomain(t *testing.T) {
 	ctx := setupZoneDB(t)
-	zone, err := Create(ctx, Input{Domain: "example.com", ClaimsOwnership: true})
+
+	adminSite, err := CreateSite(ctx, SiteInput{Domain: "infvar.com"})
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), adminSite.Zone.OwnerID)
+
+	userSite, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "infvar.com"})
+	require.NoError(t, err)
+	require.Equal(t, uint64(42), userSite.Zone.OwnerID)
+	require.NotEqual(t, adminSite.Zone.ID, userSite.Zone.ID)
+	require.Equal(t, "infvar.com", userSite.Domain.Domain)
+}
+
+func TestCreateSiteRejectsDomainBoundByAnotherOwner(t *testing.T) {
+	ctx := setupZoneDB(t)
+
+	adminSite, err := CreateSite(ctx, SiteInput{Domain: "www.infvar.com"})
+	require.NoError(t, err)
+	routeID := uint(9)
+	domain := adminSite.Domain
+	domain.ProxyRouteID = &routeID
+	require.NoError(t, repository.SaveZoneDomain(ctx, &domain))
+
+	_, err = CreateOwnedSite(ctx, 42, SiteInput{Domain: "www.infvar.com"})
+	require.EqualError(t, err, errDomainInUse)
+}
+
+func TestCreateDomainRejectsDuplicateInSameZone(t *testing.T) {
+	ctx := setupZoneDB(t)
+	zone, err := Create(ctx, Input{Domain: "example.com"})
+	require.NoError(t, err)
+	_, err = CreateDomain(ctx, zone.ID, DomainInput{Domain: "www.example.com"})
+	require.NoError(t, err)
+	_, err = CreateDomain(ctx, zone.ID, DomainInput{Domain: "www.example.com"})
+	require.EqualError(t, err, errDomainExists)
+}
+
+func TestCreateOwnedSiteRequiresDomainVerificationForClaimedZone(t *testing.T) {
+	ctx := setupZoneDB(t)
+	zone, err := CreateOwned(ctx, 42, Input{Domain: "example.com", ClaimsOwnership: true})
 	require.NoError(t, err)
 	zone.VerificationStatus = zoneVerificationStatusVerified
 	require.NoError(t, db.DB(ctx).Save(zone).Error)
 
-	site, err := CreateOwnedSite(ctx, 0, SiteInput{Domain: "www.example.com"})
+	site, err := CreateOwnedSite(ctx, 42, SiteInput{Domain: "www.example.com"})
 	require.NoError(t, err)
 	require.Equal(t, "pending", site.Domain.VerificationStatus)
+}
+
+func TestAdminCreateSiteSkipsTXTVerification(t *testing.T) {
+	ctx := setupZoneDB(t)
+
+	site, err := CreateSite(ctx, SiteInput{Domain: "www.example.com"})
+	require.NoError(t, err)
+	require.Equal(t, "verified", site.Zone.VerificationStatus)
+	require.NotNil(t, site.Zone.VerifiedAt)
+	require.Equal(t, "verified", site.Domain.VerificationStatus)
+	require.NotNil(t, site.Domain.VerifiedAt)
+
+	item, err := CreateDomain(ctx, site.Zone.ID, DomainInput{Domain: "api.example.com"})
+	require.NoError(t, err)
+	require.Equal(t, "verified", item.VerificationStatus)
+	require.NotNil(t, item.VerifiedAt)
 }
 
 func TestDeleteDomainRejectsBoundRoute(t *testing.T) {

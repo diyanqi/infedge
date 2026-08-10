@@ -217,6 +217,45 @@ func ListZoneDomainsByIDs(ctx context.Context, domainIDs []uint) ([]model.ZoneDo
 	return ordered, nil
 }
 
+type zoneDomainOwnerRow struct {
+	DomainID uint   `gorm:"column:domain_id"`
+	OwnerID  uint64 `gorm:"column:owner_id"`
+}
+
+// ListZoneDomainOwners returns each domain's Zone owner id keyed by domain id.
+func ListZoneDomainOwners(ctx context.Context, domainIDs []uint) (map[uint]uint64, error) {
+	if len(domainIDs) == 0 {
+		return map[uint]uint64{}, nil
+	}
+	var rows []zoneDomainOwnerRow
+	if err := db.DB(ctx).Model(&model.ZoneDomain{}).
+		Select("of_zone_domains.id AS domain_id, of_zones.owner_id").
+		Joins("JOIN of_zones ON of_zones.id = of_zone_domains.zone_id").
+		Where("of_zone_domains.id IN ?", domainIDs).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	owners := make(map[uint]uint64, len(rows))
+	for _, row := range rows {
+		owners[row.DomainID] = row.OwnerID
+	}
+	return owners, nil
+}
+
+// GetBoundZoneDomainByDomain returns any zone domain with the exact hostname
+// already bound to a proxy route. excludeIDs lets updates skip the row being changed.
+func GetBoundZoneDomainByDomain(ctx context.Context, domain string, excludeIDs []uint) (*model.ZoneDomain, error) {
+	query := db.DB(ctx).Where("domain = ? AND proxy_route_id IS NOT NULL", domain)
+	if len(excludeIDs) > 0 {
+		query = query.Where("id NOT IN ?", excludeIDs)
+	}
+	var item model.ZoneDomain
+	if err := query.First(&item).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 // CountZoneDomainsByCertificateID reports whether a certificate is assigned to a model.Zone domain.
 func CountZoneDomainsByCertificateID(ctx context.Context, certificateID uint) (int64, error) {
 	var count int64

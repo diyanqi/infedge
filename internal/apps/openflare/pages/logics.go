@@ -119,11 +119,15 @@ func ListProjects(ctx context.Context) ([]View, error) {
 // ListProjectsOwned lists Pages projects visible to an ordinary user.
 func ListProjectsOwned(ctx context.Context, ownerID uint64) ([]View, error) {
 	projects, err := repository.ListPagesProjectsByOwner(ctx, ownerID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	views := make([]View, 0, len(projects))
 	for index := range projects {
 		view, err := buildProjectView(ctx, &projects[index])
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		views = append(views, *view)
 	}
 	return views, nil
@@ -141,7 +145,9 @@ func GetProject(ctx context.Context, id uint) (*View, error) {
 // GetProjectOwned gets a Pages project only for its owner.
 func GetProjectOwned(ctx context.Context, id uint, ownerID uint64) (*View, error) {
 	project, err := repository.GetPagesProjectByIDAndOwner(ctx, id, ownerID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return buildProjectView(ctx, project)
 }
 
@@ -163,10 +169,14 @@ func CreateProject(ctx context.Context, input Input) (*View, error) {
 // CreateProjectOwned creates a Pages project for one owner.
 func CreateProjectOwned(ctx context.Context, ownerID uint64, input Input) (*View, error) {
 	project, err := buildProject(nil, input)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	project.OwnerID = ownerID
 	if err = repository.CreatePagesProjectRecord(ctx, project); err != nil {
-		if isUniqueConstraintError(err) { return nil, errors.New(errPagesSlugExists) }
+		if isUniqueConstraintError(err) {
+			return nil, errors.New(errPagesSlugExists)
+		}
 		return nil, err
 	}
 	return buildProjectView(ctx, project)

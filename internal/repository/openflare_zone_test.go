@@ -71,6 +71,24 @@ func TestReplaceZoneDomainRouteBindingsReplacesCurrentRouteBindings(t *testing.T
 	require.Equal(t, &routeID, domains[1].ProxyRouteID)
 }
 
+func TestReplaceZoneDomainRouteBindingsRejectsSameNameBoundInAnotherZone(t *testing.T) {
+	conn := setupZoneTestDB(t)
+	ctx := context.Background()
+
+	adminZone := model.Zone{Domain: "shared.example.com"}
+	userZone := model.Zone{Domain: "shared.example.com", OwnerID: 7}
+	require.NoError(t, conn.Create(&adminZone).Error)
+	require.NoError(t, conn.Create(&userZone).Error)
+	adminDomain := model.ZoneDomain{ZoneID: adminZone.ID, Domain: "app.shared.example.com"}
+	userDomain := model.ZoneDomain{ZoneID: userZone.ID, Domain: "app.shared.example.com"}
+	require.NoError(t, conn.Create(&adminDomain).Error)
+	require.NoError(t, conn.Create(&userDomain).Error)
+
+	require.NoError(t, ReplaceZoneDomainRouteBindings(ctx, 41, []uint{adminDomain.ID}))
+	err := ReplaceZoneDomainRouteBindings(ctx, 42, []uint{userDomain.ID})
+	require.ErrorIs(t, err, ErrZoneDomainBoundToAnotherRoute)
+}
+
 func TestListZoneDomainsByRouteID(t *testing.T) {
 	conn := setupZoneTestDB(t)
 	ctx := context.Background()
@@ -87,4 +105,23 @@ func TestListZoneDomainsByRouteID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, domains, 1)
 	require.Equal(t, boundDomain.ID, domains[0].ID)
+}
+
+func TestListZoneDomainOwners(t *testing.T) {
+	conn := setupZoneTestDB(t)
+	ctx := context.Background()
+
+	adminZone := model.Zone{Domain: "admin.example.com"}
+	userZone := model.Zone{Domain: "user.example.com", OwnerID: 7}
+	require.NoError(t, conn.Create(&adminZone).Error)
+	require.NoError(t, conn.Create(&userZone).Error)
+	adminDomain := model.ZoneDomain{ZoneID: adminZone.ID, Domain: "api.admin.example.com"}
+	userDomain := model.ZoneDomain{ZoneID: userZone.ID, Domain: "api.user.example.com"}
+	require.NoError(t, conn.Create(&adminDomain).Error)
+	require.NoError(t, conn.Create(&userDomain).Error)
+
+	owners, err := ListZoneDomainOwners(ctx, []uint{adminDomain.ID, userDomain.ID})
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), owners[adminDomain.ID])
+	require.Equal(t, uint64(7), owners[userDomain.ID])
 }

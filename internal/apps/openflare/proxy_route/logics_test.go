@@ -70,6 +70,7 @@ func TestCreateProxyRouteRejectsUnverifiedZoneDomain(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 	domain := createZoneDomain(t, ctx, "pending.example.com", nil)
+	require.NoError(t, db.DB(ctx).Model(&model.Zone{}).Where("id = ?", domain.ZoneID).Update("owner_id", uint64(7)).Error)
 	require.NoError(t, db.DB(ctx).Model(domain).Update("verification_status", "pending").Error)
 
 	_, err := CreateProxyRoute(ctx, Input{
@@ -78,6 +79,22 @@ func TestCreateProxyRouteRejectsUnverifiedZoneDomain(t *testing.T) {
 		OriginURL:     "http://origin.example.com:8080",
 	})
 	require.EqualError(t, err, errProxyRouteDomainUnverified)
+}
+
+func TestCreateProxyRouteAllowsPendingAdminZoneDomain(t *testing.T) {
+	cleanup := setupProxyRouteTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	domain := createZoneDomain(t, ctx, "admin-pending.example.com", nil)
+	require.NoError(t, db.DB(ctx).Model(domain).Update("verification_status", "pending").Error)
+
+	view, err := CreateProxyRoute(ctx, Input{
+		SiteName:      "admin-pending-site",
+		ZoneDomainIDs: []uint{domain.ID},
+		OriginURL:     "http://origin.example.com:8080",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []uint{domain.ID}, view.ZoneDomainIDs)
 }
 
 func TestCreateProxyRoutePersistsUpstreamWeights(t *testing.T) {
@@ -144,6 +161,37 @@ func TestCreateProxyRouteRejectsInvalidZoneDomainBindings(t *testing.T) {
 	require.NoError(t, err)
 	_, err = CreateProxyRoute(ctx, Input{SiteName: "second", ZoneDomainIDs: []uint{domain.ID}, OriginURL: "http://other.example.com:8080"})
 	require.Error(t, err)
+	require.NoError(t, DeleteProxyRoute(ctx, first.ID))
+}
+
+func TestCreateProxyRouteRejectsSameNameBoundInAnotherZone(t *testing.T) {
+	cleanup := setupProxyRouteTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	adminZone := &model.Zone{Domain: "shared.example.com"}
+	userZone := &model.Zone{Domain: "shared.example.com", OwnerID: 7}
+	require.NoError(t, db.DB(ctx).Create(adminZone).Error)
+	require.NoError(t, db.DB(ctx).Create(userZone).Error)
+	adminDomain := &model.ZoneDomain{ZoneID: adminZone.ID, Domain: "app.shared.example.com", VerificationStatus: "verified"}
+	userDomain := &model.ZoneDomain{ZoneID: userZone.ID, Domain: "app.shared.example.com", VerificationStatus: "verified"}
+	require.NoError(t, db.DB(ctx).Create(adminDomain).Error)
+	require.NoError(t, db.DB(ctx).Create(userDomain).Error)
+
+	first, err := CreateProxyRoute(ctx, Input{
+		SiteName:      "admin-app",
+		ZoneDomainIDs: []uint{adminDomain.ID},
+		OriginURL:     "http://origin.example.com:8080",
+	})
+	require.NoError(t, err)
+
+	_, err = CreateOwnedProxyRoute(ctx, 7, Input{
+		SiteName:      "user-app",
+		ZoneDomainIDs: []uint{userDomain.ID},
+		OriginURL:     "http://origin.example.com:8080",
+	})
+	require.EqualError(t, err, errProxyRouteZoneDomainBound)
+
 	require.NoError(t, DeleteProxyRoute(ctx, first.ID))
 }
 

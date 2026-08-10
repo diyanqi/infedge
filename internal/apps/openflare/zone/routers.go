@@ -20,7 +20,7 @@ func abort(c *gin.Context, err error, missing string) bool {
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		response.AbortNotFound(c, missing)
-	case err.Error() == errDomainExists:
+	case IsConflict(err):
 		response.AbortConflict(c, err.Error())
 	default:
 		response.AbortBadRequest(c, err.Error())
